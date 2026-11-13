@@ -1,0 +1,1980 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>상세페이지 메이커</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;700;900&family=Gowun+Dodum&family=IBM+Plex+Sans+KR:wght@400;500;700&family=Jua&family=Nanum+Myeongjo:wght@400;700;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* 도구 화면: 차분한 회청색 작업대 위에 흰 카드, 코발트 한 가지 강조색. 상세페이지 결과물은 업체가 고른 테마·대표 색을 따로 쓴다. */
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --surface-2:#F6F8FA; --line:#D6DCE3;
+  --ink:#17202A; --dim:#5A6775; --accent:#2447D6; --accent-ink:#FFFFFF;
+  --ok:#1B7A4B; --warn:#A8590B; --danger:#BF3327;
+  --f-ui:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  --radius:10px;
+  color-scheme:light;
+}
+*{box-sizing:border-box;}
+[hidden]{display:none !important;}
+html,body{margin:0; padding:0;}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-ui); font-size:15px; line-height:1.55; word-break:keep-all; overflow-wrap:break-word;}
+button,input,select,textarea{font-family:inherit; font-size:inherit; color:inherit;}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+.app{max-width:1080px; margin:0 auto; padding:0 16px 80px;}
+.top{position:sticky; top:0; z-index:30; background:var(--bg); padding:14px 0 0; border-bottom:1px solid var(--line);}
+.top-row{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+.mark{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;}
+.mark b{font-size:19px; letter-spacing:-.02em;}
+.mark .sq{width:14px; height:14px; background:var(--accent); display:inline-block; transform:translateY(1px);}
+.mark span.sub{color:var(--dim); font-size:13px;}
+.save-state{font-size:12.5px; color:var(--dim); display:flex; align-items:center; gap:6px;}
+.save-dot{width:8px; height:8px; border-radius:50%; background:var(--ok);}
+.save-dot.busy{background:var(--warn);}
+.save-dot.off{background:var(--danger);}
+.tabs{display:flex; gap:2px; margin-top:12px; overflow-x:auto;}
+.tab-btn{border:0; background:none; padding:10px 14px; font-weight:700; color:var(--dim); border-bottom:3px solid transparent; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:7px;}
+.tab-btn .n{display:inline-flex; width:20px; height:20px; align-items:center; justify-content:center; background:var(--line); color:var(--ink); font-size:12px; border-radius:4px;}
+.tab-btn.active{color:var(--ink); border-bottom-color:var(--accent);}
+.tab-btn.active .n{background:var(--accent); color:var(--accent-ink);}
+main{padding-top:18px;}
+.panel{display:none;}
+.panel.active{display:block;}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-bottom:14px;}
+.card h2{font-size:17px; margin:0 0 4px; letter-spacing:-.01em;}
+.card h3{font-size:15px; margin:0 0 4px;}
+.hint{color:var(--dim); font-size:13px; margin:4px 0 0;}
+.field{margin-top:12px;}
+.field label, .lab{display:block; font-weight:700; font-size:13.5px; margin-bottom:5px;}
+.field label small{font-weight:400; color:var(--dim);}
+.input{width:100%; border:1px solid var(--line); border-radius:8px; padding:9px 11px; background:var(--surface); line-height:1.5;}
+textarea.input{min-height:84px; resize:vertical;}
+.input:focus{border-color:var(--accent); outline:none; box-shadow:0 0 0 3px rgba(36,71,214,.14);}
+.grid-2{display:grid; grid-template-columns:1fr 1fr; gap:0 14px;}
+.grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:0 14px;}
+@media (max-width:680px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+.btn-row{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px;}
+.btn{border:1px solid var(--line); background:var(--surface); border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
+.btn:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.55; cursor:default;}
+.btn-primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+.btn-primary:hover{border-color:var(--accent); filter:brightness(.93);}
+.btn-ghost{border-color:transparent; background:none; color:var(--dim);}
+.btn-danger{color:var(--danger);}
+.btn-sm{padding:6px 10px; font-size:13px;}
+.note{background:var(--surface-2); border-left:4px solid var(--accent); padding:10px 12px; font-size:13.5px; border-radius:0 8px 8px 0; margin-top:12px;}
+.warnbox{background:#FFF6E9; border:1px solid #F0CF9C; color:#6B3A05; border-radius:8px; padding:8px 11px; font-size:13px; margin-top:8px;}
+.warnbox b{color:var(--warn);}
+.okline{color:var(--ok); font-size:13px; font-weight:700;}
+.example-bar{background:#17202A; color:#fff; border-radius:var(--radius); padding:12px 16px; margin-bottom:14px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; font-size:14px;}
+.example-bar .btn{background:#fff; color:#17202A; border-color:#fff;}
+details.tips{margin-top:12px; border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:var(--surface-2);}
+details.tips summary{cursor:pointer; font-weight:700; font-size:13.5px;}
+details.tips ul{margin:8px 0 0; padding-left:18px; font-size:13.5px; color:var(--dim);}
+details.tips li{margin-bottom:4px;}
+/* 테마 고르기 */
+.theme-pick{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:8px;}
+@media (max-width:680px){.theme-pick{grid-template-columns:1fr;}}
+.theme-opt{border:2px solid var(--line); border-radius:10px; padding:12px; cursor:pointer; background:var(--surface); text-align:left;}
+.theme-opt.on{border-color:var(--accent); box-shadow:0 0 0 3px rgba(36,71,214,.14);}
+.theme-opt b{display:block; font-size:15px;}
+.theme-opt span{display:block; font-size:12.5px; color:var(--dim); margin-top:3px;}
+.swatches{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px;}
+.sw{width:34px; height:34px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; padding:0;}
+.sw.on{box-shadow:0 0 0 3px var(--ink);}
+input[type=color]{width:44px; height:38px; padding:2px; border:1px solid var(--line); border-radius:8px; background:var(--surface); cursor:pointer;}
+.preview-box{margin-top:14px; border:1px solid var(--line); border-radius:10px; overflow:hidden; max-width:430px;}
+/* 사진 */
+.thumbs{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+.thumb{position:relative; width:84px; height:84px; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:var(--surface-2);}
+.thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+.thumb.contain img{object-fit:contain;}
+.thumb .x{position:absolute; top:3px; right:3px; width:22px; height:22px; border-radius:50%; border:0; background:rgba(23,32,42,.82); color:#fff; font-size:13px; line-height:1; cursor:pointer;}
+.drop{display:flex; align-items:center; justify-content:center; text-align:center; min-height:84px; padding:10px 14px; border:1.5px dashed var(--line); border-radius:8px; color:var(--dim); font-size:13px; cursor:pointer; background:var(--surface-2);}
+.drop.sm{width:84px; height:84px; min-height:0; padding:4px; font-size:12px;}
+.drop.over{border-color:var(--accent); color:var(--accent); background:#EEF2FF;}
+.slot-row{padding:12px 0; border-top:1px dashed var(--line);}
+.slot-row:first-of-type{border-top:0;}
+.sec-tag{display:inline-block; font-size:12px; font-weight:700; background:var(--surface-2); border:1px solid var(--line); border-radius:4px; padding:1px 7px; margin-right:6px;}
+/* 기획안 목록 */
+.plan-item{display:flex; gap:12px; padding:11px 0; border-top:1px solid var(--line);}
+.plan-item:first-child{border-top:0;}
+.plan-no{flex:none; width:28px; height:28px; border-radius:6px; background:var(--surface-2); border:1px solid var(--line); font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center;}
+.plan-item .t{font-weight:700;}
+.plan-item .d{color:var(--dim); font-size:13px; margin-top:2px;}
+/* 표시사항 입력 */
+.label-grid{display:grid; grid-template-columns:150px 1fr; gap:6px 10px; align-items:center; margin-top:10px;}
+.label-grid .k{font-weight:700; font-size:13.5px;}
+@media (max-width:560px){.label-grid{grid-template-columns:1fr;} .label-grid .k{margin-top:6px;}}
+/* 3단계 */
+.outline{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
+.outline a{font-size:12.5px; text-decoration:none; color:var(--ink); border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:4px 10px;}
+.outline a.w{border-color:#F0CF9C; background:#FFF6E9;}
+.page-stack{max-width:860px; margin:18px auto 0;}
+.sc-wrap{margin-bottom:22px; border:1px solid var(--line); border-radius:10px; background:var(--surface); overflow:hidden;}
+.sc-bar{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; padding:8px 10px; border-bottom:1px solid var(--line); background:var(--surface-2);}
+.sc-bar .nm{font-weight:700; font-size:13.5px;}
+.sc-bar .acts{display:flex; gap:4px; flex-wrap:wrap;}
+.sc-extra{padding:0 12px;}
+.sc-form{padding:12px; border-bottom:1px solid var(--line);}
+.dp [contenteditable]{outline:none; cursor:text;}
+.dp [contenteditable]:hover{box-shadow:0 0 0 1px rgba(36,71,214,.35);}
+.dp [contenteditable]:focus{box-shadow:0 0 0 2px rgba(36,71,214,.8);}
+.hl-bar{position:fixed; z-index:60; display:flex; gap:4px; background:var(--ink); padding:5px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.25);}
+.hl-bar button{border:0; border-radius:5px; padding:6px 10px; font-weight:700; font-size:13px; cursor:pointer; background:#FFD75E; color:#17202A;}
+.hl-bar button.off{background:#3A4654; color:#fff;}
+.steps-list{counter-reset:st; margin-top:10px;}
+.step-row{display:flex; gap:12px; padding:10px 0; border-top:1px solid var(--line);}
+.step-row:first-child{border-top:0;}
+.step-row .cn{flex:none; width:26px; height:26px; background:var(--ink); color:#fff; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;}
+.step-row > div{flex:1; min-width:0;}
+.radio-col{display:flex; flex-direction:column; gap:5px; font-size:13.5px; margin-top:6px;}
+.radio-col label{display:flex; gap:7px; align-items:flex-start; cursor:pointer;}
+.radio-col input{margin-top:4px;}
+.thumb-grid{display:flex; flex-wrap:wrap; gap:8px;}
+.thumb-grid button{width:72px; height:72px; padding:0; border:2px solid var(--line); border-radius:8px; overflow:hidden; cursor:pointer; background:none;}
+.thumb-grid button.on{border-color:var(--accent);}
+.thumb-grid img{width:100%; height:100%; object-fit:cover; display:block;}
+.thumb-wrap{max-width:320px; margin-top:12px; border:1px solid var(--line);}
+.thumb-wrap canvas{width:100%; height:auto; display:block; cursor:grab; touch-action:none;}
+/* 스펙북 */
+.sb-card{border:1px solid var(--line); border-radius:10px; background:var(--surface); margin-bottom:12px; overflow:hidden;}
+.sb-head{display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; padding:12px 16px; background:var(--surface-2); border-bottom:1px solid var(--line);}
+.sb-head b{font-size:16px;}
+.sb-rows{display:grid; grid-template-columns:140px 1fr auto; font-size:13.5px;}
+.sb-rows > div{padding:8px 12px; border-bottom:1px solid var(--line);}
+.sb-rows .sb-lab{font-weight:700; background:var(--surface-2);}
+.sb-rows .sb-val{white-space:pre-wrap;}
+@media (max-width:560px){.sb-rows{grid-template-columns:1fr auto;} .sb-rows .sb-lab{grid-column:1/-1; border-bottom:0; padding-bottom:0;}}
+.toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 18px; border-radius:8px; font-size:14px; z-index:80; max-width:90vw; box-shadow:0 8px 28px rgba(0,0,0,.25);}
+#capHost{position:absolute; left:-12000px; top:0; width:860px; pointer-events:none;}
+@media (prefers-reduced-motion: reduce){*{transition:none !important; animation:none !important;}}
+</style>
+<style id="artCss"></style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="top-row">
+      <div class="mark"><span class="sq"></span><b>상세페이지 메이커</b><span class="sub">식품 브랜드용 · 내 자료로 만드는 상세페이지</span></div>
+      <div class="save-state" role="status" aria-live="polite"><span class="save-dot" id="saveDot"></span><span id="saveText">이 브라우저에 저장됨</span></div>
+    </div>
+    <nav class="tabs" aria-label="단계">
+      <button class="tab-btn" data-tab="brand" type="button"><span class="n">0</span>브랜드 설정</button>
+      <button class="tab-btn" data-tab="plan" type="button"><span class="n">1</span>제품 정보·기획안</button>
+      <button class="tab-btn" data-tab="images" type="button"><span class="n">2</span>사진 올리기</button>
+      <button class="tab-btn" data-tab="finish" type="button"><span class="n">3</span>카피 다듬기·다운로드</button>
+      <button class="tab-btn" data-tab="spec" type="button">제품 스펙북</button>
+    </nav>
+  </header>
+
+  <main>
+    <div id="exampleBar"></div>
+    <div id="storeWarn"></div>
+
+    <!-- 0. 브랜드 설정 -->
+    <section class="panel" id="panel-brand">
+      <div class="card">
+        <h2>브랜드 기본 정보</h2>
+        <p class="hint">처음 한 번만 입력하면 모든 제품의 상세페이지에 똑같이 쓰여요. 여기에 적지 않은 인증·수상·수치는 상세페이지에 들어가지 않아요.</p>
+        <div class="grid-2">
+          <div class="field"><label for="bName">브랜드명</label><input class="input" id="bName" data-b="name" placeholder="예: 한결식품"></div>
+          <div class="field"><label for="bEn">영문 표기 또는 짧은 라벨 <small>(선택)</small></label><input class="input" id="bEn" data-b="en" placeholder="예: HANGYEOL FOOD"></div>
+        </div>
+        <div class="field"><label for="bTagline">브랜드 한 줄 소개</label><input class="input" id="bTagline" data-b="tagline" placeholder="예: 경북 안동에서 3대째 이어 온 장류 전문 브랜드"></div>
+      </div>
+
+      <div class="card">
+        <h2>디자인 고르기</h2>
+        <p class="hint">테마와 대표 색을 고르면 모든 섹션의 색·글꼴·번호 배지·배너·그래프 모양이 함께 바뀌어요. 언제든 다시 바꿀 수 있어요.</p>
+        <div class="theme-pick" id="themePick" role="radiogroup" aria-label="테마"></div>
+        <div class="lab" style="margin-top:14px;">대표 색</div>
+        <div class="swatches" id="swatches"></div>
+        <div class="preview-box" id="themePreview" aria-label="테마 미리보기"></div>
+      </div>
+
+      <div class="card">
+        <h2>로고와 대표 사진</h2>
+        <p class="hint">로고는 첫 화면과 마무리 섹션에 들어가요(배경이 투명한 PNG 권장). 대표 사진은 브랜드 이야기 섹션에 들어가요.</p>
+        <div class="grid-2">
+          <div class="field"><div class="lab">로고</div><div class="thumbs" id="logoBox"></div>
+            <label style="display:flex; gap:6px; align-items:center; font-size:13.5px; margin-top:8px;"><input type="checkbox" id="bShowLogo"> 상세페이지에 로고 넣기</label></div>
+          <div class="field"><div class="lab">대표 사진 <small style="font-weight:400; color:var(--dim);">(선택)</small></div><div class="thumbs" id="portraitBox"></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>브랜드 이야기 <small style="font-weight:400; color:var(--dim); font-size:13px;">(선택 · 비우면 이야기 섹션을 만들지 않아요)</small></h2>
+        <div class="field"><label for="bQuote">한 줄 인용구</label><input class="input" id="bQuote" data-b="storyQuote" placeholder="예: 우리 가족이 먹는 장만 만듭니다"></div>
+        <div class="field"><label for="bStory">이야기 (2~4문장)</label><textarea class="input" id="bStory" data-b="storyBody" placeholder="언제, 어디서, 왜 시작했는지 사실대로 적어주세요."></textarea></div>
+      </div>
+
+      <div class="card">
+        <h2>인증 · 수상 · 방송 <small style="font-weight:400; color:var(--dim); font-size:13px;">(선택)</small></h2>
+        <p class="hint">실제로 받은 것만 적어주세요. 적은 내용이 그대로 신뢰 배지·수상 이력·방송 소개 섹션이 돼요.</p>
+        <div class="field"><label for="bCerts">인증 배지 <small>(줄마다 하나 · 최대 4개)</small></label><textarea class="input" id="bCerts" data-b="certs" style="min-height:64px;" placeholder="예:&#10;HACCP 인증&#10;전통식품 품질인증"></textarea></div>
+        <div class="field"><label for="bAwards">수상·선정 이력 <small>(줄마다 하나 · 연도로 시작하면 연도가 크게 보여요)</small></label><textarea class="input" id="bAwards" data-b="awards" placeholder="예:&#10;2024 농림축산식품부 장관상&#10;2025 지역 우수 농식품 선정"></textarea></div>
+        <div class="field"><div class="lab">수상 사진 <small style="font-weight:400; color:var(--dim);">(상장·시상식 등)</small></div><div class="thumbs" id="awardImgBox"></div></div>
+        <div class="field"><label for="bMedia">방송·언론 소개 <small>(줄마다 하나)</small></label><textarea class="input" id="bMedia" data-b="media" style="min-height:64px;" placeholder="예:&#10;KBS 6시 내고향 (2025)"></textarea></div>
+        <div class="field"><div class="lab">방송 화면 캡처</div><div class="thumbs" id="mediaImgBox"></div></div>
+      </div>
+
+      <div class="card">
+        <h2>확인된 수치 <small style="font-weight:400; color:var(--dim); font-size:13px;">(선택 · 비우면 통계 섹션을 만들지 않아요)</small></h2>
+        <p class="hint">재구매율·만족도처럼 근거 자료가 있는 수치만 적어주세요. 여기에 없는 %수치를 문구에 쓰면 3단계에서 주의 표시가 떠요.</p>
+        <div class="grid-2">
+          <div class="field"><label for="bStatNum">큰 숫자</label><input class="input" id="bStatNum" data-b="statBigNum" placeholder="예: 87%"></div>
+          <div class="field"><label for="bStatLabel">큰 숫자 설명</label><input class="input" id="bStatLabel" data-b="statBigLabel" placeholder="예: 다시 주문하신 고객 비율 (2025년 자사몰 기준)"></div>
+          <div class="field"><label for="bStatPct">그래프 수치 (0~100)</label><input class="input" id="bStatPct" data-b="statPct" inputmode="numeric" placeholder="예: 93"></div>
+          <div class="field"><label for="bStatPctLabel">그래프 이름</label><input class="input" id="bStatPctLabel" data-b="statPctLabel" placeholder="예: 구매 만족도"></div>
+        </div>
+        <div class="field"><label for="bStatClose">마무리 한 줄</label><input class="input" id="bStatClose" data-b="statClosing" placeholder="예: 한 번 드신 분들이 다시 찾아주십니다"></div>
+      </div>
+
+      <div class="card">
+        <h2>쓰지 않을 표현 <small style="font-weight:400; color:var(--dim); font-size:13px;">(선택)</small></h2>
+        <p class="hint">우리 브랜드에서 쓰면 안 되는 말을 쉼표로 구분해 적어주세요. 문구에 들어가면 주의 표시가 떠요. 효능·과장·근거 없는 "100%" 같은 표현은 따로 적지 않아도 기본으로 점검해요.</p>
+        <div class="field"><input class="input" id="bBanned" data-b="banned" aria-label="쓰지 않을 표현" placeholder="예: 수제, 손맛, 무방부제"></div>
+      </div>
+
+      <div class="card">
+        <h2>표시사항·배송 공통 값</h2>
+        <div class="grid-2">
+          <div class="field"><label for="bCompany">상호</label><input class="input" id="bCompany" data-b="company" placeholder="예: (주)한결식품"></div>
+          <div class="field"><label for="bRole">표시사항에서의 역할</label><select class="input" id="bRole" data-b="companyRole"><option value="제조원">제조원</option><option value="유통전문판매원">유통전문판매원</option></select></div>
+        </div>
+        <div class="field"><label for="bAddr">주소</label><input class="input" id="bAddr" data-b="addr" placeholder="표시사항에 적는 사업장 주소"></div>
+        <div class="grid-2">
+          <div class="field"><label for="bTel">소비자상담실 전화</label><input class="input" id="bTel" data-b="tel" placeholder="예: 054-000-0000"></div>
+          <div class="field"><label for="bReturn">반품 및 교환장소</label><input class="input" id="bReturn" data-b="returnPlace" placeholder="본사 및 구입처"></div>
+        </div>
+        <div class="field"><label for="bShipTitle">배송·보관 안내 제목 <small>(비우면 배송 안내 섹션을 만들지 않아요)</small></label><input class="input" id="bShipTitle" data-b="shipTitle" placeholder="예: 받으신 즉시 냉장 보관해주세요"></div>
+        <div class="field"><label for="bShipBody">배송·보관 안내 본문</label><textarea class="input" id="bShipBody" data-b="shipBody" style="min-height:64px;" placeholder="예: 신선도를 위해 아이스팩과 함께 보냉 포장으로 보내드려요."></textarea></div>
+        <div class="field"><label for="bShipIcons">안내 카드 <small>(줄마다 "아이콘 | 제목 | 설명" · 선택)</small></label><textarea class="input" id="bShipIcons" data-b="shipIcons" style="min-height:64px;" placeholder="예:&#10;🚚 | 평일 오후 2시 이전 주문 | 당일 출고&#10;🧊 | 보냉 포장 | 아이스팩 동봉"></textarea></div>
+      </div>
+
+      <div class="card">
+        <h2>자료 백업</h2>
+        <p class="hint">입력한 자료와 사진은 <b>지금 쓰는 이 브라우저에만</b> 저장돼요. 다른 컴퓨터나 다른 브라우저에서는 보이지 않고, 브라우저 기록을 지우면 함께 지워져요. 백업 파일을 받아 두면 다른 기기에서 불러오거나 복구할 수 있어요.</p>
+        <div class="btn-row">
+          <button class="btn" type="button" id="btnBackup">백업 파일 받기</button>
+          <label class="btn" for="restoreFile">백업 파일 불러오기</label><input type="file" id="restoreFile" accept="application/json,.json" hidden>
+          <button class="btn btn-ghost btn-danger" type="button" id="btnWipe">모든 자료 지우기</button>
+        </div>
+        <div class="hint" id="backupStatus"></div>
+      </div>
+    </section>
+
+    <!-- 1. 제품 정보·기획안 -->
+    <section class="panel" id="panel-plan">
+      <div class="card">
+        <h2>제품 고르기 · 저장된 상세페이지</h2>
+        <p class="hint">전에 작업한 제품을 고르면 그대로 열려요. 새 제품은 아래에 바로 입력하면 제품명으로 자동 저장돼요.</p>
+        <select class="input" id="selProduct" aria-label="저장된 제품" style="margin-top:8px;"></select>
+        <div class="btn-row"><button class="btn btn-sm" type="button" id="btnNewProduct">새 제품으로 시작</button><span class="hint" id="pickerStatus" style="margin:0;"></span></div>
+      </div>
+
+      <div class="card">
+        <h2>제품 정보를 입력하면 상세페이지 기획안을 짜 드려요</h2>
+        <p class="hint">입력한 내용이 구매 여정 순서(첫 화면 → 강한 한 방 → 시즐컷 → 특징 → 추천 → 조리법 → 후기 → 마무리 → 표시사항)에 맞춰 섹션으로 배치돼요. 비워 둔 항목의 섹션은 만들지 않아요.</p>
+        <details class="tips"><summary>문구 작성 요령 보기</summary>
+          <ul>
+            <li><b>근거 → 결과</b>로 쓰기: "국산 콩 사용"에서 끝내지 말고 "국산 콩을 그대로 띄워 구수한 맛이 깊어요"처럼 고객이 느끼는 결과까지.</li>
+            <li><b>긍정문</b>으로 쓰기: "~가 아니라", "걱정되셨죠?"처럼 걱정을 먼저 꺼내지 말고 좋은 점을 바로 말하기.</li>
+            <li><b>숫자</b>는 확인되는 것만: 조리 시간, 실제 나열한 개수("3가지"), 원재료명의 함량. 함량이 작아 보이면 숫자 대신 "듬뿍·가득".</li>
+            <li>원산지는 <b>원재료별</b>로: "국내산 배추"처럼. 모든 원재료가 국산이 아니면 "국산 100%"는 쓸 수 없어요.</li>
+            <li>식품에는 <b>효능·질병·다이어트</b> 표현, 근거 없는 "최고·1위·유일"을 쓰지 않아요.</li>
+            <li>제목은 20자 안팎, 설명은 2문장 이내로 짧게. 글씨를 크게 넣기 때문이에요.</li>
+          </ul>
+        </details>
+        <div class="grid-2">
+          <div class="field"><label for="mName">제품명</label><input class="input" id="mName" data-m="productName" placeholder="예: 3년 숙성 재래 된장"></div>
+          <div class="field"><label for="mCat">카테고리 <small>(선택)</small></label><input class="input" id="mCat" data-m="category" placeholder="예: 장류, 떡, 밀키트"></div>
+        </div>
+        <div class="field"><label for="mHero">첫 화면 한 줄 <small>(고객의 고민을 풀어주는 한 문장 · 20자 안팎)</small></label><input class="input" id="mHero" data-m="heroTitle" placeholder="예: 찌개 맛이 달라지는 된장을 찾으셨다면"></div>
+        <div class="field"><label for="mHeroSub">첫 화면 보조 문구 <small>(12자 안팎)</small></label><input class="input" id="mHeroSub" data-m="heroSub" placeholder="예: 항아리에서 3년 익혔어요"></div>
+        <div class="grid-2">
+          <div class="field"><label for="mBanner">임팩트 배너 한 줄 <small>(선택 · 사진 위 굵은 글씨)</small></label><input class="input" id="mBanner" data-m="banner" placeholder="예: 콩과 소금, 물로만 담갔어요"></div>
+          <div class="field"><label for="mBannerSub">배너 보조 문구 <small>(선택)</small></label><input class="input" id="mBannerSub" data-m="bannerSub" placeholder=""></div>
+        </div>
+        <div class="field"><label for="mPoints">제품 특징 <small>(줄마다 "제목 | 설명" · 3~5개 권장)</small></label><textarea class="input" id="mPoints" data-m="points" style="min-height:120px;" placeholder="예:&#10;국산 콩으로 띄운 메주 | 경북 안동산 콩을 삶아 띄워 구수한 향이 깊어요&#10;항아리에서 3년 | 사계절을 세 번 지나며 맛이 부드럽게 익어요"></textarea></div>
+        <div class="field"><label for="mSizzle">먹음직스러운 사진에 얹을 문구 <small>(줄마다 하나 · 2~4개 · 15자 안팎)</small></label><textarea class="input" id="mSizzle" data-m="sizzle" style="min-height:74px;" placeholder="예:&#10;보글보글 끓는 순간의 구수한 향&#10;한 숟가락에 밥 한 공기"></textarea></div>
+        <div class="grid-3">
+          <div class="field"><label for="mCmpT">차별점 제목 <small>(선택)</small></label><input class="input" id="mCmpT" data-m="cmpTitle" placeholder="예: 오래 익힐수록 색이 깊어져요"></div>
+          <div class="field"><label for="mCmpB">차별점 설명</label><input class="input" id="mCmpB" data-m="cmpBody"></div>
+          <div class="field"><label for="mCmpG">강조 문구</label><input class="input" id="mCmpG" data-m="cmpTag"></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label for="mRec">이런 분께 추천 <small>(줄마다 하나 · 4~5개)</small></label><textarea class="input" id="mRec" data-m="recommend" placeholder="예:&#10;집밥 찌개 맛을 살리고 싶은 분&#10;부모님께 드릴 선물을 찾는 분"></textarea></div>
+          <div class="field"><label for="mUsage">이렇게 즐겨보세요 <small>(줄마다 하나 · 3개 권장)</small></label><textarea class="input" id="mUsage" data-m="usage" placeholder="예:&#10;된장찌개로&#10;쌈장으로&#10;나물 무침에"></textarea></div>
+        </div>
+        <div class="field"><label for="mRecipe">조리법 <small>(레시피 이름은 "## 이름", 그 아래 줄마다 한 단계)</small></label><textarea class="input" id="mRecipe" data-m="recipes" style="min-height:120px;" placeholder="예:&#10;## 된장찌개&#10;물 500ml에 된장 한 큰술 반을 풀어요&#10;두부와 애호박을 넣고 5분 끓여요&#10;대파를 올려 마무리해요"></textarea></div>
+        <div class="field"><label for="mReviews">고객 후기 <small>(줄마다 하나 · 실제 후기만)</small></label><textarea class="input" id="mReviews" data-m="reviews" placeholder="실제 고객이 남긴 후기를 그대로 옮겨 적어주세요."></textarea></div>
+        <div class="grid-2">
+          <div class="field"><label for="mCta">마무리 한 줄 <small>(선택)</small></label><input class="input" id="mCta" data-m="ctaTitle" placeholder="예: 오늘 저녁, 구수한 찌개 한 뚝배기 어떠세요"></div>
+          <div class="field"><label for="mKey">강조할 핵심 단어 <small>(쉼표로 구분 · 형광펜 표시)</small></label><input class="input" id="mKey" data-m="keyPointsRaw" placeholder="예: 국산 콩, 3년 숙성, 항아리"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>식품 표시사항</h2>
+        <p class="hint">정리해 둔 표시 문구가 있으면 아래 칸에 그대로 붙여넣고 "칸에 채우기"를 누르세요. 값은 입력한 그대로만 들어가고, 비어 있는 항목은 상세페이지에 나오지 않아요.</p>
+        <textarea class="input" id="labelRaw" aria-label="표시사항 붙여넣기" style="min-height:74px; margin-top:8px;" placeholder="예: 식품유형 - 한식된장&#10;소비기한 - 제조일로부터 24개월&#10;원재료명 - 대두(국산), 천일염(국산), 정제수"></textarea>
+        <div class="btn-row"><button class="btn btn-sm" type="button" id="btnParseLabel">칸에 채우기</button><span class="hint" id="labelParseStatus" style="margin:0;"></span></div>
+        <div class="label-grid" id="labelGrid"></div>
+      </div>
+
+      <div class="card">
+        <div class="btn-row" style="margin-top:0;">
+          <button class="btn btn-primary" type="button" id="btnBuild">기획안 만들기</button>
+          <span class="hint" id="buildStatus" style="margin:0;"></span>
+        </div>
+        <div id="planResult" style="margin-top:8px;"></div>
+      </div>
+    </section>
+
+    <!-- 2. 사진 -->
+    <section class="panel" id="panel-images">
+      <div class="card">
+        <h2>사진 올리기</h2>
+        <p class="hint">섹션마다 필요한 사진을 올려주세요. 한꺼번에 올리면 비어 있는 칸에 위에서부터 차례로 채워져요. 사진은 올릴 때 가로 1720px 이하로 가볍게 줄여서 이 브라우저에 저장해요.</p>
+        <label class="drop" id="bulkDrop" for="bulkFile" style="margin-top:10px;">여러 장 한꺼번에 올리기 · 눌러서 고르거나 이 위로 끌어다 놓으세요</label>
+        <input type="file" id="bulkFile" accept="image/*" multiple hidden>
+      </div>
+      <div id="imagesList"></div>
+    </section>
+
+    <!-- 3. 다듬기·다운로드 -->
+    <section class="panel" id="panel-finish">
+      <div class="card">
+        <h2>내보내기</h2>
+        <h3 style="margin-top:12px;">① 이미지로 받기</h3>
+        <p class="hint">이미지만 올릴 수 있는 쇼핑몰(쿠팡 등)에 써요.</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" type="button" id="btnDownloadAll">전체 이어붙여 받기</button>
+          <button class="btn" type="button" id="btnDownloadEach">섹션별로 받기 (ZIP)</button>
+          <button class="btn" type="button" id="btnSmartZip">스마트스토어용 받기 (ZIP)</button>
+        </div>
+        <div class="radio-col" style="flex-direction:row; flex-wrap:wrap; gap:14px;">
+          <b>파일 형식</b>
+          <label><input type="radio" name="dlFmt" value="jpg" checked> JPG (가벼움 · 20MB 이하로 맞춤)</label>
+          <label><input type="radio" name="dlFmt" value="png"> PNG (원본 화질)</label>
+        </div>
+        <p class="hint">스마트스토어용 ZIP에는 섹션별 JPG와, 통계 섹션이 있으면 숫자가 올라가는 움직이는 GIF, 그리고 아래 검색용 글자 파일이 함께 들어 있어요.</p>
+        <div class="hint" id="dlStatus" role="status"></div>
+
+        <div class="note" style="border-left-color:var(--ok);">
+          <b>스마트스토어 · 검색용 글자 붙여넣기</b>
+          <div class="hint">사진 안의 글자는 네이버 검색과 AI 검색(제미나이·챗GPT)이 읽지 못해요. 사진을 모두 올린 뒤 상세설명 맨 아래에 이 글을 글자로 한 번 붙여 넣어주세요. 입력한 제품 정보와 표시사항으로 초안을 만들고, 직접 고칠 수 있어요.</div>
+          <textarea class="input" id="aeoText" aria-label="검색용 글자" style="min-height:150px; margin-top:8px; font-size:13.5px;"></textarea>
+          <div class="btn-row"><button class="btn btn-sm btn-primary" type="button" id="btnAeoCopy">스마트스토어용 복사</button><button class="btn btn-sm" type="button" id="btnAeoDraft">입력값으로 초안 다시 만들기</button><span class="hint" id="aeoStatus" style="margin:0;"></span></div>
+        </div>
+
+        <h3 style="margin-top:18px;">② 카페24에 올리기</h3>
+        <p class="hint">사진은 카페24에 따로 올리고 코드는 가볍게 붙여넣는 방식이에요. 글자가 실제 텍스트로 들어가서 검색에도 유리해요.</p>
+        <div class="steps-list">
+          <div class="step-row"><span class="cn">1</span><div><b>사진 묶음 받기</b><div class="btn-row" style="margin-top:6px;"><button class="btn btn-sm btn-primary" type="button" id="btnCafeZip">사진 묶음(ZIP) 받기</button></div><div class="hint">압축을 풀어주세요. 사진이나 문구를 고친 뒤에는 다시 받아 올려주세요.</div></div></div>
+          <div class="step-row"><span class="cn">2</span><div><b>카페24에 사진 올리기</b><div class="hint">카페24 관리자 → 디자인 → 파일 업로더에서 폴더를 하나 정해 사진을 모두 올리세요. 사진 이름이 사진마다 달라 여러 제품을 한 폴더에 올려도 겹치지 않아요.</div></div></div>
+          <div class="step-row"><span class="cn">3</span><div><b>사진 주소 하나 붙여넣기</b><div class="hint">올린 사진 중 하나의 주소를 복사해 아래 칸에 붙여넣으세요. 폴더 주소는 기억해 둬요.</div><input class="input" id="cafeBase" aria-label="카페24 사진 주소" placeholder="예: /web/upload/detail/dp_1a2b3c4d5e6f.jpg" style="margin-top:6px;"></div></div>
+          <div class="step-row"><span class="cn">4</span><div><b>코드 복사해서 붙여넣기</b>
+            <div class="radio-col" id="cafeMotionBox">
+              <span class="hint" style="margin:0;"><b>움직이는 효과</b> · 쇼핑몰 앱에서 스크롤이 끊기면 한 단계씩 낮춰 보세요.</span>
+              <label><input type="radio" name="cafeMotion" value="light"><span><b>숫자만 (추천)</b> · 통계와 글 속 큰 숫자가 올라가고 그래프가 채워져요.</span></label>
+              <label><input type="radio" name="cafeMotion" value="text"><span><b>숫자 + 섹션 제목</b> · 각 섹션의 큰 제목도 떠올라요. 사진은 고정.</span></label>
+              <label><input type="radio" name="cafeMotion" value="full"><span><b>전체</b> · 사진과 목록도 차례로 등장해요. 일부 앱에서 끊길 수 있어요.</span></label>
+              <label><input type="radio" name="cafeMotion" value="off"><span><b>없음</b> · 완성된 화면만.</span></label>
+            </div>
+            <div class="btn-row"><button class="btn btn-sm btn-primary" type="button" id="btnCafeCode">카페24용 코드 복사</button></div>
+            <div class="hint">상품 수정 → 상세설명 "직접 작성" → 에디터의 &lt; &gt; 를 누르고 붙여넣은 뒤 저장하세요.</div>
+            <div class="hint" id="cafeStatus" role="status"></div>
+            <textarea class="input" id="cafeCode" aria-label="카페24 코드" readonly hidden style="min-height:120px; font-size:11px; font-family:monospace; margin-top:8px;"></textarea></div></div>
+        </div>
+
+        <h3 style="margin-top:18px;">③ HTML 파일로 받기 (보관용)</h3>
+        <p class="hint">사진까지 한 파일에 담긴 HTML이에요. 파일이 무거우니 카페24에는 ②번을 써주세요.</p>
+        <div class="btn-row"><button class="btn" type="button" id="btnDownloadHtml">상세페이지 HTML 받기</button></div>
+      </div>
+
+      <div class="card" id="thumbCard">
+        <h2>대표 이미지(썸네일) 받기 · 1200×1200</h2>
+        <p class="hint">올린 사진 중 하나를 골라 정사각형 대표 이미지로 받아요. 미리보기를 끌면 위치가, 막대로 크기가 바뀌어요.</p>
+        <div class="thumb-grid" id="thumbPicker" style="margin-top:10px;"></div>
+        <div id="thumbEditor" hidden>
+          <div class="thumb-wrap"><canvas id="thumbCanvas" width="1200" height="1200" aria-label="썸네일 미리보기"></canvas></div>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; max-width:320px; margin-top:8px;"><b>확대</b><input type="range" id="thumbZoom" min="100" max="300" step="5" value="100" style="flex:1;"></label>
+          <div class="radio-col" style="flex-direction:row; gap:14px;"><label><input type="radio" name="thumbMode" value="cover" checked> 꽉 채우기</label><label><input type="radio" name="thumbMode" value="contain"> 사진 전체 (흰 여백)</label></div>
+          <div class="btn-row"><button class="btn btn-primary btn-sm" type="button" id="btnThumbDownload">이 사진 썸네일 받기</button><button class="btn btn-sm" type="button" id="btnThumbAll">모두 받기 (ZIP)</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>카피 다듬기</h2>
+        <p class="hint">아래 미리보기에서 글자를 누르면 바로 고칠 수 있어요. 글자를 끌어서 고른 뒤 "강조하기"를 누르면 형광펜이 칠해져요. 목록 개수를 바꾸려면 섹션 위의 "항목 고치기"를 쓰세요.</p>
+        <div class="outline" id="finishOutline"></div>
+        <div class="btn-row"><select class="input" id="addType" aria-label="추가할 섹션 종류" style="width:auto;"></select><button class="btn btn-sm" type="button" id="btnAddSection">섹션 추가</button></div>
+      </div>
+      <div class="page-stack" id="pageStack"></div>
+      <div class="hl-bar" id="hlBar" hidden><button type="button" id="hlOn">강조하기</button><button type="button" class="off" id="hlOff">강조 빼기</button></div>
+    </section>
+
+    <!-- 스펙북 -->
+    <section class="panel" id="panel-spec"><div id="specBody"></div></section>
+  </main>
+</div>
+<div id="capHost" aria-hidden="true"></div>
+<div id="toastHost"></div>
+<script>
+(function(){
+'use strict';
+// ================= 공통 도구 =================
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function uid(){ return 'i'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+function debounce(fn, ms){ var t; return function(){ var a=arguments, c=this; clearTimeout(t); t=setTimeout(function(){ fn.apply(c,a); }, ms); }; }
+function clone(o){ return o==null ? o : JSON.parse(JSON.stringify(o)); }
+function lines(raw){ return String(raw||'').split('\n').map(function(l){ return l.replace(/^[\s\-•·*]+/,'').trim(); }).filter(Boolean); }
+function plain(t){ return String(t==null?'':t).replace(/\*\*/g,''); }
+function toast(msg, ms){
+  var h = $('toastHost'); h.innerHTML = '<div class="toast" role="status">'+esc(msg)+'</div>';
+  clearTimeout(toast.t); toast.t = setTimeout(function(){ h.innerHTML=''; }, ms||3200);
+}
+// 지우기처럼 되돌릴 수 없는 일은 버튼을 두 번 눌러야 실행
+function armTwice(btn, msg, fn){
+  if(btn.dataset.armed==='1'){ btn.dataset.armed=''; btn.textContent = btn.dataset.o; fn(); return; }
+  btn.dataset.o = btn.textContent; btn.dataset.armed='1'; btn.textContent = msg;
+  setTimeout(function(){ if(btn.dataset.armed==='1'){ btn.dataset.armed=''; btn.textContent = btn.dataset.o; } }, 4000);
+}
+function copyText(text, okMsg){
+  var done = function(){ toast(okMsg||'복사했어요.'); };
+  var fb = function(){
+    var ta = document.createElement('textarea'); ta.value = text; ta.style.cssText='position:fixed; left:-9999px; top:0;'; document.body.appendChild(ta); ta.select();
+    var ok=false; try{ ok = document.execCommand('copy'); }catch(e){} document.body.removeChild(ta);
+    if(ok) done(); else toast('복사하지 못했어요. 글자를 직접 선택해서 복사해주세요.');
+  };
+  try{ if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, fb); return; } }catch(e){}
+  fb();
+}
+
+// ================= 저장소 어댑터 (지금: 브라우저 IndexedDB · 나중에 서버 저장으로 바꿀 때 이 부분만 교체) =================
+var Store = (function(){
+  var db = null, mem = {kv:{}, img:{}};
+  function open(){
+    return new Promise(function(res){
+      var fin = false, end = function(v){ if(!fin){ fin=true; res(v); } };
+      setTimeout(function(){ end(false); }, 3000);
+      try{
+        var rq = indexedDB.open('detail-maker-v1', 1);
+        rq.onupgradeneeded = function(){ var d = rq.result; if(!d.objectStoreNames.contains('kv')) d.createObjectStore('kv'); if(!d.objectStoreNames.contains('img')) d.createObjectStore('img'); };
+        rq.onsuccess = function(){ db = rq.result; end(true); };
+        rq.onerror = function(){ end(false); }; rq.onblocked = function(){ end(false); };
+      }catch(e){ end(false); }
+    });
+  }
+  function run(store, mode, fn){
+    return new Promise(function(res, rej){
+      try{
+        var t = db.transaction(store, mode), out, r = fn(t.objectStore(store));
+        if(r) r.onsuccess = function(){ out = r.result; };
+        t.oncomplete = function(){ res(out); }; t.onerror = t.onabort = function(){ rej(t.error||new Error('저장 실패')); };
+      }catch(e){ rej(e); }
+    });
+  }
+  return {
+    open: open,
+    ok: function(){ return !!db; },
+    get: function(k){ return db ? run('kv','readonly',function(s){ return s.get(k); }) : Promise.resolve(mem.kv[k]); },
+    set: function(k, v){ if(!db){ mem.kv[k]=v; return Promise.resolve(); } return run('kv','readwrite',function(s){ s.put(v, k); }); },
+    putImg: function(id, blob){ if(!db){ mem.img[id]=blob; return Promise.resolve(); } return run('img','readwrite',function(s){ s.put(blob, id); }); },
+    delImg: function(id){ if(!db){ delete mem.img[id]; return Promise.resolve(); } return run('img','readwrite',function(s){ s.delete(id); }); },
+    allImgs: function(){
+      if(!db) return Promise.resolve(Object.keys(mem.img).map(function(k){ return {id:k, blob:mem.img[k]}; }));
+      return new Promise(function(res){
+        var out = [];
+        try{
+          var c = db.transaction('img','readonly').objectStore('img').openCursor();
+          c.onsuccess = function(){ var cur = c.result; if(cur){ out.push({id:cur.key, blob:cur.value}); cur.continue(); } else res(out); };
+          c.onerror = function(){ res(out); };
+        }catch(e){ res(out); }
+      });
+    },
+    clearAll: function(){ if(!db){ mem = {kv:{}, img:{}}; return Promise.resolve(); } return run('kv','readwrite',function(s){ s.clear(); }).then(function(){ return run('img','readwrite',function(s){ s.clear(); }); }); }
+  };
+})();
+
+// ================= 파일 받기 어댑터 (Claude 아티팩트에서는 downloads 기능, 일반 웹에서는 브라우저 다운로드) =================
+var Platform = { dl:null };
+function saveFile(filename, data){
+  var blob = (data instanceof Blob) ? data : new Blob([data], {type:'text/plain;charset=utf-8'});
+  if(Platform.dl) return Platform.dl.save({filename:filename, data:data}).catch(function(e){ if(e && /declin|cancel|denied/i.test(String(e.code||e.message||''))) return; throw e; });
+  return new Promise(function(res){
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); res(); }, 1500);
+  });
+}
+function initPlatform(){
+  try{ if(window.claude && typeof window.claude.use==='function'){ window.claude.use('downloads').then(function(d){ if(d) Platform.dl = d; }, function(){}); } }catch(e){}
+}
+
+// ================= 사진 =================
+var IMG = {}; // id -> {blob, url}
+function imgUrl(id){ return (id && IMG[id]) ? IMG[id].url : ''; }
+function registerImg(id, blob){ if(IMG[id]) URL.revokeObjectURL(IMG[id].url); IMG[id] = {blob:blob, url:URL.createObjectURL(blob)}; }
+function canvasBlob(c, type, q){ return new Promise(function(res){ c.toBlob(function(b){ res(b); }, type, q); }); }
+// 올릴 때 가로 1720px 이하 JPG(투명 배경이면 PNG)로 가볍게 바꿔 저장
+function normalizeImage(file){
+  if(/gif|svg/.test(file.type||'') || !window.createImageBitmap) return Promise.resolve(file);
+  return createImageBitmap(file).then(function(bmp){
+    var MAXW = 1720, k = Math.min(1, MAXW/bmp.width);
+    var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(bmp.width*k)); c.height = Math.max(1, Math.round(bmp.height*k));
+    var x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(bmp, 0, 0, c.width, c.height);
+    var alpha = false;
+    if(/png|webp/.test(file.type||'')){ try{ var d = x.getImageData(0,0,c.width,c.height).data; for(var i=3;i<d.length;i+=4*11){ if(d[i]<250){ alpha=true; break; } } }catch(e){ alpha=true; } }
+    if(!alpha){ x.globalCompositeOperation='destination-over'; x.fillStyle='#ffffff'; x.fillRect(0,0,c.width,c.height); }
+    return canvasBlob(c, alpha?'image/png':'image/jpeg', 0.88).then(function(b){ return b || file; });
+  }).catch(function(){ return file; });
+}
+function addImage(file){
+  return normalizeImage(file).then(function(blob){
+    var id = uid(); registerImg(id, blob);
+    return Store.putImg(id, blob).catch(function(){ storeFail(); }).then(function(){ return id; });
+  });
+}
+function imageFiles(list){ return Array.prototype.filter.call(list||[], function(f){ return /^image\//.test(f.type||''); }); }
+function wireDrop(el, onFiles){
+  el.addEventListener('dragover', function(e){ e.preventDefault(); el.classList.add('over'); });
+  el.addEventListener('dragleave', function(){ el.classList.remove('over'); });
+  el.addEventListener('drop', function(e){ e.preventDefault(); el.classList.remove('over'); var f = imageFiles(e.dataTransfer && e.dataTransfer.files); if(f.length) onFiles(f); });
+}
+
+// ================= 색 계산 =================
+function hexRgb(h){ h = String(h||'').replace('#',''); if(h.length===3) h = h.replace(/(.)/g,'$1$1'); var n = parseInt(h,16); if(isNaN(n)||h.length!==6) n = 0x2E7D5B; return [(n>>16)&255, (n>>8)&255, n&255]; }
+function rgbHex(c){ return '#'+c.map(function(v){ return ('0'+Math.max(0,Math.min(255,Math.round(v))).toString(16)).slice(-2); }).join('').toUpperCase(); }
+function mix(a, b, t){ var x = hexRgb(a), y = hexRgb(b); return rgbHex([x[0]+(y[0]-x[0])*t, x[1]+(y[1]-x[1])*t, x[2]+(y[2]-x[2])*t]); }
+function lum(h){ var c = hexRgb(h).map(function(v){ v/=255; return v<=.03928 ? v/12.92 : Math.pow((v+.055)/1.055, 2.4); }); return .2126*c[0]+.7152*c[1]+.0722*c[2]; }
+function palette(acc){
+  var L = lum(acc);
+  return { acc:acc, accD:mix(acc,'#000000', L>.4 ? .5 : .32), accL:(L<.28 ? mix(acc,'#FFFFFF',.5) : acc), accT:mix(acc,'#FFFFFF',.9), accT2:mix(acc,'#FFFFFF',.74), onAcc:(L>.5 ? '#14181D' : '#FFFFFF'), hl:mix(acc,'#FFFFFF',.72) };
+}
+function themeVars(){
+  var p = palette(brand.accent);
+  return '--acc:'+p.acc+';--acc-d:'+p.accD+';--acc-l:'+p.accL+';--acc-t:'+p.accT+';--acc-t2:'+p.accT2+';--on-acc:'+p.onAcc+';--hl:'+p.hl+';';
+}
+
+// ================= 테마 =================
+var THEMES = {
+  modern:{name:'모던', desc:'굵은 고딕 · 왼쪽 정렬 · 숫자 01 배지 · 막대그래프', fonts:'family=Gothic+A1:wght@400;700;900'},
+  soft:{name:'포근', desc:'둥근 글씨 · 대표 색 바탕 · 동그라미 배지 · 반원 그래프', fonts:'family=Gowun+Dodum&family=Jua'},
+  classic:{name:'클래식', desc:'명조 제목 · 가는 선 · 로마 숫자 · 원형 그래프', fonts:'family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nanum+Myeongjo:wght@400;700;800'}
+};
+var SWATCHES = ['#1F6F54','#C8442B','#1D4E89','#B7791F','#7A3B69','#2B2B2B','#D9622B','#0F7C8C'];
+function themeOf(){ return THEMES[brand.theme] ? brand.theme : 'modern'; }
+
+// 상세페이지 그림 CSS. § = 범위(앱 안에서는 .dp, 내보낼 때는 아이디), 소문자 px = 화면 폭에 따라 줄어드는 단위
+var ART = [
+'§{--u:1PX; font-family:var(--f-body); color:var(--ink); background:var(--bg); line-height:1.5; word-break:keep-all; overflow-wrap:break-word; text-align:var(--ta); font-size:28px; -webkit-text-size-adjust:100%; text-size-adjust:100%;}',
+'§ *{box-sizing:border-box;}',
+"§.t-modern{--bg:#FFFFFF; --bg2:#F1F3F5; --ink:#12161B; --ink2:#525C66; --line:#D9DEE3; --dark:#12161B; --on-dark:#FFFFFF; --f-head:'Gothic A1','Apple SD Gothic Neo','Malgun Gothic',sans-serif; --f-body:'Gothic A1','Apple SD Gothic Neo','Malgun Gothic',sans-serif; --hw:900; --ta:left; --jc:flex-start; --mxa:0; --rad:0px; --rad2:6px; --chip:4px; --ls:-.04em;}",
+"§.t-soft{--bg:var(--acc-t); --bg2:#FFFFFF; --ink:#2F2B28; --ink2:#6A635E; --line:var(--acc-t2); --dark:var(--acc-d); --on-dark:#FFFFFF; --f-head:'Jua','Apple SD Gothic Neo','Malgun Gothic',sans-serif; --f-body:'Gowun Dodum','Apple SD Gothic Neo','Malgun Gothic',sans-serif; --hw:400; --ta:center; --jc:center; --mxa:auto; --rad:44px; --rad2:30px; --chip:999px; --ls:-.01em;}",
+"§.t-classic{--bg:#F5F5F2; --bg2:#FFFFFF; --ink:#1B1A18; --ink2:#5F5B55; --line:#C9C6BF; --dark:#1B1A18; --on-dark:#F3F1EC; --f-head:'Nanum Myeongjo','AppleMyungjo','Batang',serif; --f-body:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif; --hw:800; --ta:center; --jc:center; --mxa:auto; --rad:0px; --rad2:0px; --chip:0px; --ls:-.03em;}",
+'§ .sec{position:relative; width:100%; background:var(--bg); --card:var(--bg2); overflow:hidden;}',
+'§ .sec.alt{background:var(--bg2); --card:var(--bg);}',
+'§ .sec.dark{background:var(--dark); color:var(--on-dark); --card:rgba(255,255,255,.1);}',
+'§ .pad{padding:100px 60px;}',
+'§ .pad > :last-child{margin-bottom:0;}',
+'§ .eyebrow{font-size:23px; font-weight:700; letter-spacing:.2em; line-height:1.4; color:var(--acc-d); margin:0 0 22px;}',
+'§ .dark .eyebrow{color:var(--acc-l);}',
+'§ .headline{font-family:var(--f-head); font-weight:var(--hw); font-size:62px; line-height:1.25; letter-spacing:var(--ls); color:var(--ink); margin:0 0 30px; white-space:pre-line;}',
+'§ .dark .headline{color:var(--on-dark);}',
+'§ .body-text{font-size:31px; line-height:1.72; color:var(--ink2); margin:0 0 44px; white-space:pre-line;}',
+'§ .dark .body-text{color:var(--on-dark); opacity:.86;}',
+'§ mark.hl{background-color:var(--hl); color:var(--ink); font-weight:700; padding:0 5px;}',
+'§ .ph{position:relative; width:100%; overflow:hidden; background-color:var(--card); border-radius:var(--rad); background-size:cover; background-position:center; background-repeat:no-repeat;}',
+'§ .ph::before{content:""; display:block; padding-top:75%;}',
+'§ .ph.sq::before{padding-top:100%;}',
+'§ .ph.wide::before{padding-top:56.25%;}',
+'§ .ph img{position:absolute; left:0; top:0; width:100% !important; height:100% !important; max-width:none !important; object-fit:cover; display:block; margin:0 !important; padding:0 !important; border:0 !important;}',
+'§ .ph .guide{position:absolute; left:0; top:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:30px; font-size:22px; line-height:1.5; color:var(--ink2); border:2PX dashed var(--line);}',
+/* 첫 화면 */
+'§ .s-hero .pad{padding:84px 60px 0;}',
+'§ .s-hero.noimg .pad{padding-bottom:84px;}',
+'§ .logo{display:flex; justify-content:var(--jc); height:70px; margin:0 0 40px;}',
+'§ .logo img{height:100% !important; width:auto !important; max-width:70% !important; display:block; object-fit:contain;}',
+'§ .s-hero .headline{font-size:86px; line-height:1.17; margin-bottom:34px;}',
+'§ .sub{display:inline-block; font-size:31px; font-weight:700; line-height:1.4; color:var(--ink);}',
+'§.t-modern .sub{border-left:10px solid var(--acc); padding:4px 0 4px 22px;}',
+'§.t-soft .sub{background:var(--acc); color:var(--on-acc); padding:16px 34px; border-radius:999px;}',
+'§.t-classic .sub{border-top:1PX solid var(--ink); border-bottom:1PX solid var(--ink); padding:16px 30px; letter-spacing:.04em;}',
+'§ .creds{display:flex; flex-wrap:wrap; gap:12px; justify-content:var(--jc); margin-top:38px;}',
+'§ .cred{font-size:22px; font-weight:700; line-height:1.3; padding:11px 20px; border:2PX solid var(--ink); border-radius:var(--chip); color:var(--ink);}',
+'§.t-soft .cred{border-color:transparent; background:#FFFFFF;}',
+'§ .s-hero .ph{margin-top:60px;}',
+'§.t-modern .s-hero .ph{margin-left:-60px; width:calc(100% + 120px);}',
+'§.t-soft .s-hero .ph{border-radius:44px 44px 0 0;}',
+/* 특징 번호 */
+'§ .num{font-family:var(--f-head); font-weight:var(--hw); line-height:1; margin:0 0 30px;}',
+'§.t-modern .num{font-size:112px; color:var(--acc); letter-spacing:-.04em;}',
+'§.t-modern .num::after{content:""; display:block; width:76px; height:10px; background:var(--ink); margin-top:18px;}',
+'§.t-soft .num{width:104px; height:104px; border-radius:50%; background:var(--acc); color:var(--on-acc); font-size:56px; display:flex; align-items:center; justify-content:center; margin-left:auto; margin-right:auto;}',
+'§.t-classic .num{font-size:40px; font-weight:400; color:var(--acc-d); display:flex; align-items:center; justify-content:center; gap:22px; letter-spacing:.1em;}',
+'§.t-classic .num::before{content:""; width:70px; height:1PX; background:var(--ink);}',
+'§.t-classic .num::after{content:""; width:70px; height:1PX; background:var(--ink);}',
+/* 배너 */
+'§ .s-banner .ph{border-radius:0; background-color:var(--dark);}',
+'§ .s-banner .ph::before{padding-top:100%;}',
+'§ .s-banner .guide{color:#FFFFFF; border-color:rgba(255,255,255,.4); align-items:flex-start; padding-top:60px;}',
+'§ .ov{position:absolute; z-index:2;}',
+'§ .ov .headline{margin:0; font-size:66px;}',
+'§ .ov .bsub{font-size:30px; line-height:1.5; margin-top:16px; color:var(--ink2);}',
+'§.t-modern .ov{left:0; bottom:0; max-width:88%; background:var(--acc); padding:44px 50px;}',
+'§.t-modern .ov .headline{color:var(--on-acc);}',
+'§.t-modern .ov .bsub{color:var(--on-acc);}',
+'§.t-soft .ov{left:36px; right:36px; bottom:36px; background:#FFFFFF; border-radius:40px; padding:40px 36px; text-align:center;}',
+'§.t-classic .ov{left:0; right:0; bottom:0; top:0; display:flex; flex-direction:column; justify-content:flex-end; padding:76px 56px; text-align:center; background:linear-gradient(to top, rgba(18,16,14,.82) 0%, rgba(18,16,14,0) 62%);}',
+'§.t-classic .ov .headline{color:#FFFFFF;}',
+'§.t-classic .ov .bsub{color:#FFFFFF;}',
+/* 시즐컷 */
+'§ .s-gallery .pad{padding-bottom:24px;}',
+'§ .cut .ph{border-radius:0;}',
+'§.t-soft .cut{padding:0 40px;}',
+'§.t-soft .cut .ph{border-radius:44px;}',
+'§ .cap{font-family:var(--f-head); font-weight:var(--hw); font-size:46px; line-height:1.32; letter-spacing:var(--ls); padding:34px 60px 70px; color:var(--ink);}',
+'§.t-soft .cap{padding-left:20px; padding-right:20px;}',
+/* 차별점 */
+'§ .tagline{margin-top:40px; font-size:34px; font-weight:700; line-height:1.45; padding:32px 38px; background:var(--dark); color:var(--on-dark); border-radius:var(--rad2);}',
+'§.t-soft .tagline{background:var(--acc); color:var(--on-acc);}',
+'§.t-classic .tagline{background:none; color:var(--ink); border-top:4PX double var(--ink); border-bottom:4PX double var(--ink); font-family:var(--f-head);}',
+/* 추천 */
+'§ .recs{display:flex; flex-direction:column; gap:18px; margin-top:10px;}',
+'§ .rec{display:flex; align-items:flex-start; gap:22px; background:var(--card); padding:30px 32px; border-radius:var(--rad2); font-size:32px; line-height:1.45; font-weight:700; text-align:left; color:var(--ink);}',
+'§ .ck{flex:none; width:46px; height:46px; border-radius:var(--chip); background:var(--acc); color:var(--on-acc); display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:900; line-height:1;}',
+'§.t-modern .rec{border-left:8px solid var(--acc); border-radius:0;}',
+'§.t-classic .rec{background:none; border-bottom:1PX solid var(--line); padding:28px 6px;}',
+'§.t-classic .ck{background:none; color:var(--acc-d); border:1PX solid var(--acc-d);}',
+/* 활용 */
+'§ .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:20px;}',
+'§ .tiles.c2{grid-template-columns:repeat(2,1fr);}',
+'§ .tile .ph{border-radius:var(--rad2);}',
+'§ .tcap{font-size:27px; font-weight:700; line-height:1.38; margin-top:16px; color:var(--ink);}',
+/* 조리법 */
+'§ .group{margin-top:54px;}',
+'§ .group.first{margin-top:10px;}',
+'§ .group .ph{border-radius:var(--rad2);}',
+'§ .group-label{font-family:var(--f-head); font-weight:var(--hw); font-size:44px; line-height:1.3; letter-spacing:var(--ls); margin:38px 0 14px; color:var(--ink);}',
+'§ .step{display:flex; gap:22px; align-items:flex-start; padding:24px 0; border-bottom:1PX solid var(--line); font-size:31px; line-height:1.55; text-align:left; color:var(--ink);}',
+'§ .sn{flex:none; min-width:54px; font-family:var(--f-head); font-weight:var(--hw); color:var(--acc-d); font-size:34px; line-height:1.4;}',
+'§.t-soft .sn{width:50px; height:50px; min-width:0; border-radius:50%; background:var(--acc); color:var(--on-acc); font-size:28px; line-height:1; display:flex; align-items:center; justify-content:center;}',
+/* 신뢰 배지 */
+'§ .badges{display:flex; flex-wrap:wrap; gap:16px; justify-content:var(--jc); margin:0 0 46px;}',
+'§ .badge{font-size:28px; font-weight:700; line-height:1.3; padding:22px 30px; background:var(--card); color:var(--ink); border-radius:var(--chip);}',
+'§.t-modern .badge{border-left:8px solid var(--acc); border-radius:0;}',
+'§.t-classic .badge{background:none; border:4PX double var(--ink);}',
+/* 브랜드 이야기 */
+'§ .portrait{width:230px; height:230px; border-radius:50%; overflow:hidden; margin:0 var(--mxa) 40px; background-size:cover; background-position:center;}',
+'§.t-modern .portrait{border-radius:0; width:200px; height:200px;}',
+'§ .portrait img{width:100% !important; height:100% !important; max-width:none !important; object-fit:cover; display:block;}',
+'§ .kicker{font-size:22px; font-weight:700; letter-spacing:.24em; color:var(--acc-d); margin-bottom:24px;}',
+'§ .quote{font-family:var(--f-head); font-weight:var(--hw); font-size:54px; line-height:1.36; letter-spacing:var(--ls); color:var(--ink); margin:0 0 36px;}',
+'§ .quote::before{content:"\\201C";}',
+'§ .quote::after{content:"\\201D";}',
+/* 후기 */
+'§ .revs{display:flex; flex-direction:column; gap:20px;}',
+'§ .rev{background:var(--card); padding:36px 38px; border-radius:var(--rad2); text-align:left;}',
+'§.t-classic .rev{background:none; border-top:1PX solid var(--ink); padding:34px 6px 14px;}',
+'§ .stars{color:var(--acc); font-size:28px; letter-spacing:.12em; margin-bottom:14px; line-height:1;}',
+'§ .q{font-size:31px; line-height:1.62; color:var(--ink);}',
+'§ .shots{display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-top:28px;}',
+'§ .shots.one{grid-template-columns:1fr;}',
+'§ .shots .ph{border-radius:var(--rad2);}',
+/* 통계 */
+'§ .s-stats .pad{padding:110px 60px;}',
+'§ .bignum{font-family:var(--f-head); font-weight:var(--hw); font-size:190px; line-height:1; letter-spacing:-.04em; color:var(--on-dark);}',
+'§ .biglabel{font-size:33px; line-height:1.5; margin-top:22px; opacity:.88;}',
+'§ .graph{margin-top:64px;}',
+'§ .closing{font-size:36px; font-weight:700; line-height:1.45; margin-top:56px;}',
+'§ .gbar .ghead{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:18px;}',
+'§ .gbar .glabel{font-size:32px; font-weight:700;}',
+'§ .gbar .gpct{font-family:var(--f-head); font-weight:900; font-size:70px; line-height:1; color:var(--acc-l);}',
+'§ .gbar .gtrack{height:34px; background:rgba(255,255,255,.16); overflow:hidden;}',
+'§ .gbar .gfill{height:100%; background:var(--acc-l);}',
+'§ .gbox{position:relative; width:320px; margin:0 auto;}',
+'§ .gbox svg{display:block; width:100%; height:auto;}',
+'§ .gov{position:absolute; left:0; right:0; top:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;}',
+'§ .gov .gpct{font-family:var(--f-head); font-weight:var(--hw); font-size:78px; line-height:1;}',
+'§ .gov .glabel{font-size:28px; line-height:1.2; margin-top:12px; opacity:.86;}',
+'§ .gbox.gauge{width:440px;}',
+'§ .gbox.gauge .gov{justify-content:flex-end; padding-bottom:4px;}',
+/* 수상 */
+'§ .plaques{display:grid; grid-template-columns:repeat(2,1fr); gap:18px; margin-top:6px; text-align:left;}',
+'§ .plaque{background:var(--card); padding:28px 28px 30px; border-top:8px solid var(--acc);}',
+'§ .yr{font-family:var(--f-head); font-weight:var(--hw); font-size:38px; line-height:1; color:var(--acc-d); margin-bottom:12px;}',
+'§ .pname{font-size:27px; font-weight:700; line-height:1.4; color:var(--ink);}',
+'§.t-soft .plaques{grid-template-columns:1fr;}',
+'§.t-soft .plaque{display:flex; align-items:center; gap:24px; border-top:0; border-radius:999px; padding:16px 34px 16px 16px;}',
+'§.t-soft .yr{flex:none; width:104px; height:104px; border-radius:50%; background:var(--acc); color:var(--on-acc); font-size:30px; display:flex; align-items:center; justify-content:center; margin:0;}',
+'§.t-classic .plaques{grid-template-columns:1fr; gap:0;}',
+'§.t-classic .plaque{display:flex; align-items:baseline; gap:30px; background:none; border-top:1PX solid var(--ink); padding:26px 6px;}',
+'§.t-classic .plaque.last{border-bottom:1PX solid var(--ink);}',
+'§.t-classic .yr{flex:none; width:120px; font-size:40px; margin:0;}',
+'§ .award-foot{font-size:26px; line-height:1.5; color:var(--ink2); margin-top:20px;}',
+'§ .grid2{display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-top:40px;}',
+'§ .grid2.one{grid-template-columns:1fr;}',
+'§ .grid2 .ph{border-radius:var(--rad2);}',
+/* 방송 */
+'§ .onair{display:inline-flex; align-items:center; gap:12px; font-size:23px; font-weight:700; letter-spacing:.2em; color:var(--acc-d); margin-bottom:24px;}',
+'§ .onair i{width:16px; height:16px; border-radius:50%; background:var(--acc); display:inline-block;}',
+'§ .progs{display:flex; flex-wrap:wrap; gap:12px; justify-content:var(--jc); margin:0 0 40px;}',
+'§ .prog{font-size:26px; font-weight:700; line-height:1.3; padding:13px 22px; border:2PX solid var(--ink); border-radius:var(--chip); color:var(--ink);}',
+'§ .tvs{display:grid; grid-template-columns:repeat(2,1fr); gap:16px;}',
+'§ .tvs .lead{grid-column:1 / -1;}',
+'§ .tvs .ph{border-radius:var(--rad2);}',
+/* 마무리 */
+'§ .s-cta .pad{padding:110px 60px 120px;}',
+'§ .recap{display:flex; flex-direction:column; gap:14px; margin:6px 0 46px; text-align:left;}',
+'§ .recap-item{display:flex; align-items:center; gap:22px; font-size:31px; font-weight:700; line-height:1.4; padding:24px 28px; background:var(--card); border-radius:var(--rad2); color:var(--ink);}',
+'§ .rn{flex:none; font-family:var(--f-head); font-weight:var(--hw); font-size:38px; color:var(--acc-d); min-width:44px; line-height:1;}',
+'§ .signoff{font-size:31px; line-height:1.7; color:var(--ink2); margin:44px 0 0; white-space:pre-line;}',
+'§ .s-cta .logo{margin:44px 0 0;}',
+'§ .cta-pill{display:inline-block; margin-top:46px; font-size:36px; font-weight:700; line-height:1.3; padding:28px 64px; background:var(--acc); color:var(--on-acc); border-radius:var(--chip);}',
+'§.t-classic .cta-pill{background:var(--ink); color:var(--bg);}',
+/* 배송 */
+'§ .ships{display:grid; grid-template-columns:repeat(2,1fr); gap:18px; margin:0 0 36px;}',
+'§ .ship{background:var(--card); padding:34px 26px; border-radius:var(--rad2); text-align:center;}',
+'§ .ship .ic{font-size:60px; line-height:1;}',
+'§ .ship .il{font-size:28px; font-weight:700; margin-top:16px; color:var(--ink); line-height:1.35;}',
+'§ .ship .id{font-size:24px; color:var(--ink2); margin-top:8px; line-height:1.5;}',
+'§ .ship-note{font-size:25px; line-height:1.7; color:var(--ink2); white-space:pre-line;}',
+/* 표시사항 */
+'§ .sec.s-label{background:#FFFFFF;}',
+'§ .s-label .pad{padding:54px 40px 60px;}',
+'§ .s-label .headline{font-family:var(--f-body); font-weight:700; font-size:26px; letter-spacing:0; margin-bottom:18px; text-align:left; color:#22272C;}',
+'§ .s-label table{width:100%; border-collapse:collapse; font-size:21px; line-height:1.6; text-align:left;}',
+'§ .s-label td{border:1PX solid #D3D7DB; padding:12px 14px; vertical-align:top; color:#22272C;}',
+'§ .s-label td.k{width:190px; font-weight:700; background:#F3F4F6;}'
+].join('\n');
+// 휴대폰에서는 본문 글씨를 조금 더 크게 (내보낸 코드에만 적용)
+var ART_MOBILE = [
+'§ .pad{padding-left:44px; padding-right:44px;}',
+'§.t-modern .s-hero .ph{margin-left:-44px; width:calc(100% + 88px);}',
+'§ .body-text{font-size:35px;}', '§ .rec{font-size:35px;}', '§ .step{font-size:34px;}', '§ .q{font-size:34px;}', '§ .recap-item{font-size:34px;}',
+'§ .tcap{font-size:30px;}', '§ .pname{font-size:30px;}', '§ .signoff{font-size:34px;}', '§ .ship .id{font-size:28px;}', '§ .ship-note{font-size:29px;}',
+'§ .s-label table{font-size:29px;}', '§ .s-label td.k{width:220px;}', '§ .s-label .headline{font-size:32px;}'
+].join('\n');
+function artCss(scope, src){
+  return (src||ART).replace(/§/g, scope).replace(/(-?)(\d+(?:\.\d+)?)px/g, 'calc(var(--u)*$1$2)').replace(/PX/g, 'px');
+}
+
+// ================= 상태 =================
+var LABEL_KEYS = ['식품유형','제품명','품목보고번호','제조원','유통전문판매원','소비기한','보관방법','원재료명','알레르기 함유','반품 및 교환장소','소비자상담실','부정불량식품 신고'];
+function defaultBrand(){
+  return { name:'', en:'', tagline:'', theme:'modern', accent:'#1F6F54', logoId:'', showLogo:true, portraitId:'', storyQuote:'', storyBody:'',
+    certs:'', awards:'', awardImgs:[], media:'', mediaImgs:[], statBigNum:'', statBigLabel:'', statPct:'', statPctLabel:'', statClosing:'', banned:'',
+    company:'', companyRole:'제조원', addr:'', tel:'', returnPlace:'', shipTitle:'', shipBody:'', shipIcons:'', cafeBase:'', cafeMotion:'light', isExample:false };
+}
+function defaultMeta(){
+  return { productName:'', category:'', heroTitle:'', heroSub:'', banner:'', bannerSub:'', points:'', sizzle:'', cmpTitle:'', cmpBody:'', cmpTag:'',
+    recommend:'', usage:'', recipes:'', reviews:'', ctaTitle:'', keyPointsRaw:'', labelFields:null, aeoText:'', aeoEdited:false };
+}
+var brand = defaultBrand();
+var state = { meta: defaultMeta(), sections: [] };
+var products = {}; // 제품 이름 -> {meta, sections, savedAt}
+function productKey(meta){ return String((meta||state.meta).productName||'').replace(/\s+/g,' ').trim(); }
+
+function labelFieldsOf(meta){
+  meta = meta || state.meta;
+  if(!meta.labelFields || !meta.labelFields.length){
+    meta.labelFields = LABEL_KEYS.map(function(k){ return {k:k, v:''}; });
+  }
+  return meta.labelFields;
+}
+// 브랜드 설정 값으로 채울 수 있는 표시사항 기본값 (사용자가 적은 값이 있으면 건드리지 않음)
+function fillLabelDefaults(meta){
+  var f = labelFieldsOf(meta), set = function(k, v){ var r = f.filter(function(x){ return x.k===k; })[0]; if(r && !r.v && v) r.v = v; };
+  set('제품명', meta.productName);
+  set(brand.companyRole==='유통전문판매원' ? '유통전문판매원' : '제조원', [brand.company, brand.addr].filter(Boolean).join(' / '));
+  set('반품 및 교환장소', brand.returnPlace || (brand.company ? '본사 및 구입처' : ''));
+  set('소비자상담실', brand.tel);
+  if(brand.company) set('부정불량식품 신고', '국번없이 1399');
+}
+
+var saveTimer = null, storeBroken = false;
+function storeFail(){ storeBroken = true; setSaveState('off'); }
+function setSaveState(mode){
+  var dot = $('saveDot'), tx = $('saveText');
+  dot.className = 'save-dot'+(mode==='busy'?' busy':mode==='off'?' off':'');
+  tx.textContent = mode==='busy' ? '저장하는 중…' : mode==='off' ? '저장되지 않아요 (백업 파일을 받아 두세요)' : '이 브라우저에 저장됨';
+}
+function saveNow(){
+  var key = productKey();
+  if(key){ products[key] = { meta: clone(state.meta), sections: clone(state.sections), savedAt: new Date().toISOString() }; }
+  return Promise.all([Store.set('brand', clone(brand)), Store.set('current', clone(state)), Store.set('products', clone(products))])
+    .then(function(){ if(!Store.ok() || storeBroken) setSaveState('off'); else setSaveState('ok'); }, storeFail);
+}
+function save(){ setSaveState('busy'); clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 500); }
+
+// ================= 글자 처리 =================
+// 한 글자짜리 어절이 줄 끝에 혼자 남지 않도록 앞뒤 어절과 묶음
+var BOUND = {'적':1,'수':1,'것':1,'줄':1,'때':1,'데':1,'뿐':1,'듯':1,'채':1,'바':1,'번':1,'분':1,'개':1,'곳':1,'거':1,'게':1,'장':1,'컷':1,'팩':1,'봉':1,'인분':1,'만큼':1,'정도':1,'동안':1};
+function core(w){ return String(w).replace(/[^가-힣0-9A-Za-z]/g,''); }
+function keepPhrases(text){
+  if(text==null) return '';
+  return String(text).replace(/ /g,' ').split('\n').map(function(line){
+    var t = line.split(' '); if(t.length<2) return line;
+    var out = t[0];
+    for(var i=1;i<t.length;i++){
+      var p = core(t[i-1]), c = core(t[i]);
+      var glue = !!BOUND[c] || (p.length===1 && /[가-힣]/.test(p) && !BOUND[p] && !/[,.!?…]$/.test(t[i-1]));
+      out += (glue ? ' ' : ' ') + t[i];
+    }
+    return out;
+  }).join('\n');
+}
+function keyPoints(){
+  var seen = {};
+  return String(state.meta.keyPointsRaw||'').split(/[,\n，、]/).map(function(k){ return k.replace(/\*\*/g,'').trim(); }).filter(function(k){ if(k.length<2 || seen[k]) return false; seen[k]=1; return true; }).slice(0,15);
+}
+function keyPointRegex(){
+  var k = keyPoints(); if(!k.length) return null;
+  k.sort(function(a,b){ return b.length-a.length; });
+  return new RegExp('('+k.map(function(x){ return esc(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'[\\s\\u00A0]*'); }).join('|')+')','g');
+}
+// **직접 강조** + 핵심 단어 자동 강조(문단마다 첫 등장만)
+function richHtml(text){
+  var html = esc(keepPhrases(text)).replace(/\*\*([\s\S]+?)\*\*/g, '<mark class="hl">$1</mark>').replace(/\*\*/g,'');
+  var re = keyPointRegex(); if(!re) return html;
+  var used = {};
+  return html.split(/(<mark class="hl">[\s\S]*?<\/mark>)/).map(function(seg){
+    if(seg.indexOf('<mark')===0) return seg;
+    return seg.replace(re, function(m){ var key = m.replace(/[\s ]/g,''); if(used[key]) return m; used[key]=1; return '<mark class="hl hl-auto">'+m+'</mark>'; });
+  }).join('');
+}
+function serializeRich(node, inMark){
+  var out = '';
+  Array.prototype.forEach.call(node.childNodes, function(n){
+    if(n.nodeType===3){ out += n.nodeValue; return; }
+    if(n.nodeType!==1) return;
+    var tag = n.tagName;
+    if(tag==='BR'){ out += '\n'; return; }
+    if(tag==='MARK' && !inMark && n.classList.contains('hl') && !n.classList.contains('hl-auto')){ var inner = serializeRich(n, true); out += inner.trim() ? '**'+inner+'**' : inner; return; }
+    if(tag==='DIV' || tag==='P'){ var t = serializeRich(n, inMark); out += (out && !/\n$/.test(out) ? '\n' : '') + t; return; }
+    out += serializeRich(n, inMark);
+  });
+  return out.replace(/ /g,' ').replace(/\*\*\*\*/g,'');
+}
+
+// ================= 섹션 =================
+var TYPES = {
+  hero:{label:'첫 화면', guide:'제품이 가장 먹음직스럽게 보이는 대표 사진 (가로형 4:3)', tip:'고객의 고민을 풀어주는 한 줄을 20자 안팎으로. 특징 나열보다 "그래서 뭐가 좋은지"를 먼저 말해요.'},
+  banner:{label:'임팩트 배너', guide:'글자를 얹어도 잘 보이는 정사각형 사진', tip:'이 제품의 가장 강한 한 방을 한 줄로. 사진 위에 굵게 올라가요.'},
+  feature:{label:'제품 특징', guide:'이 특징을 보여주는 원재료·단면·공정 사진', tip:'제목은 고객이 얻는 결과, 설명은 그 근거(원재료·방식)를 2문장 이내로.'},
+  gallery:{label:'먹음직스러운 사진', guide:'김이 오르는 순간, 윤기, 단면 같은 클로즈업', tip:'오감을 자극하는 짧은 문구(15자 안팎)를 사진마다 하나씩.'},
+  compare:{label:'차별점', guide:'차이가 눈에 보이는 사진', tip:'걱정이나 오해를 먼저 꺼내지 말고 좋은 점을 긍정문으로. 다른 제품을 깎아내리지 않아요.'},
+  recommend:{label:'추천 대상', tip:'"딱 내 얘기"라고 느낄 구체적인 상황을 4~5개, 25자 안팎으로.'},
+  usage:{label:'활용 방법', guide:'이 방법으로 즐기는 장면 (정사각형)', tip:'입력한 조리 방법 안에서만 써주세요. 3개가 보기 좋아요.'},
+  story:{label:'브랜드 이야기', tip:'언제·어디서·왜 시작했는지 사실대로. 업력 숫자는 여기에서만 쓰면 깔끔해요.'},
+  awards:{label:'수상·인증 이력', tip:'실제로 받은 것만. 연도로 시작하는 줄은 연도가 크게 보여요.'},
+  media:{label:'방송 소개', tip:'프로그램 이름과 방송사를 정확히. 캡처 사진은 브랜드 설정에서 올려요.'},
+  steps:{label:'조리법', guide:'조리 과정을 한 장에 담은 정사각형 사진', tip:'한 단계에 한 동작. 시간·불 세기 같은 숫자를 넣으면 따라 하기 쉬워요.'},
+  trust:{label:'신뢰 배지', guide:'생산 시설·원재료 산지 사진', tip:'보유한 인증만 배지로. 인증이 없으면 이 섹션은 지워주세요.'},
+  reviews:{label:'고객 후기', guide:'후기 화면 캡처 (선택)', tip:'실제 고객 후기만 옮겨 적어주세요. 지어낸 후기는 표시·광고법 위반이 될 수 있어요.'},
+  stats:{label:'통계', tip:'근거 자료가 있는 수치만. 브랜드 설정의 "확인된 수치"를 고치면 여기에 반영돼요.'},
+  cta:{label:'마무리', guide:'완성된 요리를 차려 낸 식탁 사진', tip:'핵심 3가지 요약 + 따뜻한 한마디 + 짧은 권유 문구(10자 안팎).'},
+  shipping:{label:'배송·보관 안내', tip:'받은 뒤 바로 해야 할 일을 제목으로.'},
+  label:{label:'식품 표시사항', tip:'포장지의 표시사항과 글자 하나까지 같게. 비어 있는 항목은 나오지 않아요.'}
+};
+var TYPE_ORDER = ['hero','banner','feature','gallery','compare','recommend','usage','story','awards','media','steps','trust','reviews','stats','cta','shipping','label'];
+function newSection(type, extra){
+  var s = { id:uid(), type:type, eyebrow:'', title:'', subtitle:'', body:'', tagline:'', quote:'', images:[], groups:[], tiles:[], fields:[], badges:[], reviews:[], stat:null, items:[], icons:[] };
+  for(var k in (extra||{})) s[k] = extra[k];
+  return s;
+}
+function findSection(id){ for(var i=0;i<state.sections.length;i++) if(state.sections[i].id===id) return state.sections[i]; return null; }
+function parsePoints(raw){ return lines(raw).map(function(l){ var i = l.indexOf('|'); return i<0 ? {title:l, body:''} : {title:l.slice(0,i).trim(), body:l.slice(i+1).trim()}; }); }
+function parseRecipes(raw){
+  var groups = [], cur = null;
+  String(raw||'').split('\n').forEach(function(l){
+    var t = l.trim(); if(!t) return;
+    var h = /^#{1,3}\s*(.+)$/.exec(t) || /^\[(.+)\]$/.exec(t);
+    if(h){ cur = {label:h[1].trim(), steps:[], images:[]}; groups.push(cur); return; }
+    if(!cur){ cur = {label:'조리 방법', steps:[], images:[]}; groups.push(cur); }
+    cur.steps.push({caption:t.replace(/^(\d+[.)]|[-•·*])\s*/,'')});
+  });
+  return groups.filter(function(g){ return g.steps.length; });
+}
+function parseIcons(raw){ return lines(raw).map(function(l){ var p = l.split('|').map(function(x){ return x.trim(); }); return p.length>=3 ? {icon:p[0], label:p[1], desc:p.slice(2).join(' | ')} : p.length===2 ? {icon:'', label:p[0], desc:p[1]} : {icon:'', label:p[0], desc:''}; }); }
+function statFromBrand(){
+  if(!brand.statBigNum && !brand.statPct) return null;
+  var pct = Math.max(0, Math.min(100, parseFloat(brand.statPct)||0));
+  return { bigNumber:brand.statBigNum||'', bigLabel:brand.statBigLabel||'', pct:pct, pctLabel:brand.statPctLabel||'', closingLine:brand.statClosing||'' };
+}
+// 입력값을 구매 여정 순서로 배치. 입력하지 않은 항목의 섹션은 만들지 않음.
+function buildSections(){
+  var m = state.meta, out = [], pts = parsePoints(m.points), siz = lines(m.sizzle), rec = lines(m.recommend), use = lines(m.usage), rcp = parseRecipes(m.recipes), rev = lines(m.reviews);
+  var certs = lines(brand.certs).slice(0,4), awards = lines(brand.awards), media = lines(brand.media);
+  fillLabelDefaults(m);
+  out.push(newSection('hero', { eyebrow: brand.en || brand.name || m.category, title: m.heroTitle || m.productName, subtitle: m.heroSub,
+    badges: certs.concat(awards.map(function(a){ return a.replace(/^\s*\d{4}\s*/,''); })).slice(0,3) }));
+  if(m.banner) out.push(newSection('banner', {title:m.banner, subtitle:m.bannerSub}));
+  else if(pts.length){ var p0 = pts.shift(); out.push(newSection('feature', {title:p0.title, body:p0.body})); }
+  if(media.length || brand.mediaImgs.length) out.push(newSection('media', {title:'방송에서도 소개됐어요', items:media}));
+  if(siz.length) out.push(newSection('gallery', {tiles: siz.slice(0, siz.length>=3 ? 2 : siz.length).map(function(c){ return {caption:c, images:[]}; })}));
+  pts.forEach(function(p){ out.push(newSection('feature', {title:p.title, body:p.body})); });
+  if(m.cmpTitle) out.push(newSection('compare', {title:m.cmpTitle, body:m.cmpBody, tagline:m.cmpTag}));
+  if(rec.length) out.push(newSection('recommend', {title:'이런 분들께 추천드려요', items:rec}));
+  if(use.length) out.push(newSection('usage', {title:'이렇게 즐겨보세요', tiles:use.map(function(c){ return {caption:c, images:[]}; })}));
+  if(brand.storyQuote || brand.storyBody) out.push(newSection('story', {quote:brand.storyQuote, body:brand.storyBody}));
+  if(awards.length || brand.awardImgs.length) out.push(newSection('awards', {title:'수상 및 인증 이력', items:awards}));
+  if(rcp.length) out.push(newSection('steps', {title: rcp.length>1 ? '맛있게 즐기는 방법 '+rcp.length+'가지' : '맛있게 즐기는 방법', groups:rcp}));
+  if(siz.length>=3) out.push(newSection('gallery', {tiles: siz.slice(2,4).map(function(c){ return {caption:c, images:[]}; })}));
+  if(certs.length) out.push(newSection('trust', {title:'믿고 드실 수 있도록', badges:certs}));
+  if(rev.length) out.push(newSection('reviews', {title:'먼저 드셔 본 분들의 이야기', reviews:rev.map(function(q){ return {quote:q}; })}));
+  var st = statFromBrand(); if(st) out.push(newSection('stats', {stat:st}));
+  out.push(newSection('cta', { eyebrow: brand.en || brand.name, title: m.ctaTitle || (m.productName ? m.productName+', 지금 만나보세요' : '지금 만나보세요'),
+    items: parsePoints(m.points).slice(0,3).map(function(p){ return p.title; }), body: brand.tagline, tagline:'지금 바로 만나보세요' }));
+  if(brand.shipTitle || brand.shipBody) out.push(newSection('shipping', {title:brand.shipTitle, body:brand.shipBody, icons:parseIcons(brand.shipIcons)}));
+  out.push(newSection('label', {title:'제품 표시사항', fields: clone(labelFieldsOf(m))}));
+  // 전에 올린 사진은 같은 종류·같은 순서의 섹션으로 옮겨 유지
+  var old = {}; state.sections.forEach(function(s){ (old[s.type] = old[s.type]||[]).push(s); });
+  var seen = {};
+  out.forEach(function(s){
+    var n = seen[s.type] = (seen[s.type]||0), prev = old[s.type] && old[s.type][n]; seen[s.type]++;
+    if(!prev) return;
+    s.images = prev.images||[];
+    s.tiles.forEach(function(t, i){ if(prev.tiles && prev.tiles[i]) t.images = prev.tiles[i].images||[]; });
+    s.groups.forEach(function(g, i){ if(prev.groups && prev.groups[i]) g.images = prev.groups[i].images||[]; });
+  });
+  return out;
+}
+
+// ---------- 표현 주의 점검 ----------
+var RISKY = [
+  {re:/100\s*%|100\s*프로|백\s*퍼센트/, why:'"100%"는 그 원재료만 들어갔을 때만 쓸 수 있어요'},
+  {re:/(국산|국내산|우리\s*농산물)\s*(100|만|으로만|로만|만으로)/, why:'모든 원재료가 국산이 아니면 원재료별로 적어주세요 (예: 배추(국내산))'},
+  {re:/(전부|모두|모든\s*재료|재료\s*전부).{0,6}(국산|국내산)/, why:'모든 원재료가 국산인지 표시사항으로 확인해주세요'},
+  {re:/순수\s*[가-힣]+|오직\s*[가-힣]+/, why:'"순수·오직"은 다른 원재료가 하나도 없을 때만 쓸 수 있어요'},
+  {re:/무첨가|무방부제|무색소|첨가물\s*(없|0)/, why:'"무첨가"류 표현은 표시 기준이 까다로워요. 근거가 있을 때만 써주세요'},
+  {re:/(향|맛|색|모양)[이은]?\s*아니라|걱정되(세요|시나요|시죠)|걱정하(셨|시나요)|오해(하지|하실|할 수)/, why:'걱정이나 오해를 먼저 꺼내는 표현은 방어적으로 읽혀요. 좋은 점을 긍정문으로 써보세요'},
+  {re:/글루텐\s*프리|글루텐\s*0|알레르기.{0,6}(걱정|안심|없)/, why:'같은 시설에서 알레르기 유발 원료를 함께 다룬다면 쓸 수 없는 표현이에요'},
+  {re:/면역|혈당|혈압|콜레스테롤|다이어트|해독|디톡스|항암|항산화|치료|예방|효능|효과가|약효|체중\s*감량|피로\s*회복|숙취\s*해소/, why:'식품에는 효능·질병·건강기능을 떠올리게 하는 표현을 쓸 수 없어요'},
+  {re:/최고급|최고의|국내\s*최초|세계\s*최초|유일(한|하게)|판매\s*1위|1위|넘버원|No\.?\s*1/i, why:'"최고·최초·유일·1위"는 객관적인 근거 자료가 있을 때만 쓸 수 있어요'},
+  {re:/누적\s*판매|후기\s*[\d,]+\s*(개|건|만)|[\d,]+\s*만\s*(개|봉|팩)\s*(판매|돌파)/, why:'판매량·후기 수는 근거 자료가 있을 때만 써주세요'},
+  {re:/TOP\s*\d|BEST\s*\d/i, why:'순위 표현은 실제 판매·평가 자료가 있을 때만 쓸 수 있어요. "3가지"처럼 개수로 써보세요'}
+];
+function confirmedNumbers(){
+  var src = [brand.statBigNum, brand.statPct, brand.statBigLabel].concat(labelFieldsOf().map(function(f){ return f.v; })).join(' ');
+  var set = {}; (src.match(/\d+(?:\.\d+)?/g)||[]).forEach(function(n){ set[n]=1; });
+  return set;
+}
+function riskyIn(text, isLabel){
+  var t = plain(String(text||'')), out = [];
+  if(isLabel) return out;
+  RISKY.forEach(function(r){ var m = t.match(r.re); if(m) out.push({hit:m[0].trim(), why:r.why}); });
+  String(brand.banned||'').split(/[,\n，、]/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>=2; }).forEach(function(w){ if(t.indexOf(w)>=0) out.push({hit:w, why:'브랜드 설정에서 쓰지 않기로 한 표현이에요'}); });
+  var ok = confirmedNumbers(), re = /(\d+(?:\.\d+)?)\s*%/g, m2, seenPct = {};
+  while((m2 = re.exec(t))){
+    if(seenPct[m2[1]] || m2[1]==='100') continue; seenPct[m2[1]] = 1;
+    if(!ok[m2[1]]) out.push({hit:m2[0], why:'브랜드 설정의 "확인된 수치"나 표시사항에 없는 숫자예요. 근거가 있는지 확인해주세요'});
+    else if(parseFloat(m2[1])<10) out.push({hit:m2[0], why:'작아 보이는 함량은 숫자 대신 "듬뿍·가득"으로 쓰면 더 좋아요 (원재료명 표시는 그대로)'});
+  }
+  return out;
+}
+function sectionTexts(s){
+  var a = [s.eyebrow, s.title, s.subtitle, s.body, s.tagline, s.quote].concat(s.items||[], s.badges||[]);
+  (s.tiles||[]).forEach(function(t){ a.push(t.caption); });
+  (s.groups||[]).forEach(function(g){ a.push(g.label); (g.steps||[]).forEach(function(x){ a.push(x.caption); }); });
+  (s.reviews||[]).forEach(function(r){ a.push(r.quote); });
+  if(s.stat) a.push(s.stat.bigNumber, s.stat.bigLabel, s.stat.closingLine);
+  return a.filter(Boolean).join('\n');
+}
+function warningsOf(s){
+  var w = riskyIn(sectionTexts(s), s.type==='label');
+  if(s.type==='label'){ var empty = (s.fields||[]).filter(function(f){ return !String(f.v||'').trim(); }).map(function(f){ return f.k; }); if(empty.length) w.push({tag:'확인 필요', hit:empty.join(', '), why:'비어 있는 표시사항이에요. 포장지 표시와 같게 채워주세요'}); }
+  return w;
+}
+function warnHtml(s){
+  var w = warningsOf(s); if(!w.length) return '';
+  return '<div class="warnbox">'+w.map(function(x){ return '<div><b>'+(x.tag||'표현 주의')+'</b> "'+esc(x.hit)+'" · '+esc(x.why)+'</div>'; }).join('')+'</div>';
+}
+
+// ---------- 섹션 그리기 ----------
+function sectionName(s){ return TYPES[s.type] ? TYPES[s.type].label : s.type; }
+function numLabel(n){
+  var th = themeOf();
+  if(th==='modern') return ('0'+n).slice(-2);
+  if(th==='classic') return ['','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][n] || String(n);
+  return String(n);
+}
+function graphHtml(st, t){
+  var th = themeOf(), p = palette(brand.accent), pct = (Number(st.pct)||0)*(t==null?1:t), shown = Math.round(pct)+'%', lab = esc(st.pctLabel||'');
+  var track = 'rgba(255,255,255,.2)';
+  if(th==='modern') return '<div class="graph gbar"><div class="ghead"><span class="glabel">'+lab+'</span><span class="gpct">'+shown+'</span></div><div class="gtrack"><div class="gfill" style="width:'+pct.toFixed(1)+'%"></div></div></div>';
+  if(th==='soft'){
+    var len = Math.PI*190;
+    return '<div class="graph"><div class="gbox gauge"><svg viewBox="0 0 440 240" xmlns="http://www.w3.org/2000/svg"><path d="M 30 215 A 190 190 0 0 1 410 215" fill="none" stroke="'+track+'" stroke-width="40" stroke-linecap="round"/>'+
+      '<path class="gfill" d="M 30 215 A 190 190 0 0 1 410 215" fill="none" stroke="'+p.accL+'" stroke-width="40" stroke-linecap="round" stroke-dasharray="'+len.toFixed(2)+'" stroke-dashoffset="'+(len*(1-pct/100)).toFixed(2)+'"/></svg>'+
+      '<div class="gov"><div class="gpct">'+shown+'</div><div class="glabel">'+lab+'</div></div></div></div>';
+  }
+  var c = 2*Math.PI*140;
+  return '<div class="graph"><div class="gbox"><svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg"><circle cx="160" cy="160" r="140" fill="none" stroke="'+track+'" stroke-width="4"/>'+
+    '<circle class="gfill" cx="160" cy="160" r="140" fill="none" stroke="'+p.accL+'" stroke-width="14" stroke-dasharray="'+c.toFixed(2)+'" stroke-dashoffset="'+(c*(1-pct/100)).toFixed(2)+'" transform="rotate(-90 160 160)"/></svg>'+
+    '<div class="gov"><div class="gpct">'+shown+'</div><div class="glabel">'+lab+'</div></div></div></div>';
+}
+// o = {edit:고칠 수 있게, cap:이미지로 찍는 중, src:사진 주소 함수, t:통계 진행률}
+function renderSec(s, idx, o){
+  o = o || {}; var src = o.src || imgUrl;
+  var prod = state.meta.productName || brand.name || '', altBase = esc(prod + (plain(s.title||s.quote||'') ? ' - '+plain(s.title||s.quote).replace(/\s+/g,' ').trim() : ' - '+sectionName(s)));
+  var C = function(f, extra){ return o.edit ? ' contenteditable="true" spellcheck="false" data-f="'+f+'"'+(extra||'') : ''; };
+  var T = function(x){ return esc(keepPhrases(plain(x))); };
+  var R = function(x){ return richHtml(x); };
+  var RC = function(f, extra){ return C(f, ' data-rich="1"'+(extra||'')); };
+  var ph = function(arr, guide, cls){
+    var im = arr && arr[0], url = im && src(im.id); cls = cls||'';
+    if(url) return o.cap ? '<div class="ph '+cls+'" style="background-image:url(\''+url+'\')"></div>' : '<div class="ph '+cls+'"><img src="'+url+'" alt="'+altBase+'"></div>';
+    return o.edit ? '<div class="ph empty '+cls+'"><div class="guide">사진을 올려주세요<br>'+esc(guide||'')+'</div></div>' : '';
+  };
+  var logo = function(){
+    var url = brand.showLogo!==false && brand.logoId && src(brand.logoId);
+    return url ? '<div class="logo"><img src="'+url+'" alt="'+esc(brand.name)+'"></div>' : '';
+  };
+  var G = TYPES[s.type] ? (TYPES[s.type].guide||'') : '';
+  var wrap = function(cls, inner){ return '<div class="sec s-'+s.type+' '+cls+'">'+inner+'</div>'; };
+  var head = function(size){ return '<div class="headline"'+(size?' style="font-size:calc(var(--u)*'+size+')"':'')+C('title')+'>'+T(s.title)+'</div>'; };
+  var body = function(){ return s.body ? '<div class="body-text"'+RC('body')+'>'+R(s.body)+'</div>' : ''; };
+
+  if(s.type==='hero'){
+    var hp = ph(s.images, G, '');
+    return wrap(hp?'':'noimg', '<div class="pad">'+logo()+
+      (s.eyebrow ? '<div class="eyebrow"'+C('eyebrow')+'>'+T(s.eyebrow)+'</div>' : '')+head()+
+      (s.subtitle ? '<div><div class="sub"'+C('subtitle')+'>'+T(s.subtitle)+'</div></div>' : '')+
+      ((s.badges||[]).length ? '<div class="creds">'+s.badges.map(function(b,i){ return '<div class="cred"'+C('badge',' data-i="'+i+'"')+'>'+T(b)+'</div>'; }).join('')+'</div>' : '')+hp+'</div>');
+  }
+  if(s.type==='feature'){
+    var n = 0; for(var i=0;i<=idx;i++){ if(state.sections[i] && state.sections[i].type==='feature') n++; }
+    return wrap(n%2===0?'alt':'', '<div class="pad"><div class="num">'+numLabel(n||1)+'</div>'+head()+body()+ph(s.images, G, '')+'</div>');
+  }
+  if(s.type==='banner'){
+    var bim = s.images && s.images[0], burl = bim && src(bim.id);
+    return wrap('', '<div class="ph"'+(burl && o.cap ? ' style="background-image:url(\''+burl+'\')"' : '')+'>'+(burl && !o.cap ? '<img src="'+burl+'" alt="'+altBase+'">' : '')+
+      (!burl && o.edit ? '<div class="guide">사진을 올려주세요<br>'+esc(G)+'</div>' : '')+
+      '<div class="ov"><div class="headline"'+C('title')+'>'+T(s.title)+'</div>'+(s.subtitle ? '<div class="bsub"'+C('subtitle')+'>'+T(s.subtitle)+'</div>' : '')+'</div></div>');
+  }
+  if(s.type==='gallery'){
+    var gh = (s.eyebrow||s.title) ? '<div class="pad">'+(s.eyebrow ? '<div class="eyebrow"'+C('eyebrow')+'>'+T(s.eyebrow)+'</div>' : '')+(s.title ? head() : '')+'</div>' : '';
+    return wrap('', gh+(s.tiles||[]).map(function(t,i){ return '<div class="cut">'+ph(t.images, G, '')+(t.caption ? '<div class="cap"'+C('tilecap',' data-i="'+i+'"')+'>'+T(t.caption)+'</div>' : '')+'</div>'; }).join(''));
+  }
+  if(s.type==='compare'){
+    return wrap('alt', '<div class="pad">'+head()+body()+ph(s.images, G, '')+(s.tagline ? '<div class="tagline"'+C('tagline')+'>'+T(s.tagline)+'</div>' : '')+'</div>');
+  }
+  if(s.type==='recommend'){
+    return wrap('', '<div class="pad"><div class="eyebrow">RECOMMEND</div>'+head()+body()+'<div class="recs">'+(s.items||[]).map(function(it,i){ return '<div class="rec"><span class="ck">✓</span><span'+RC('item',' data-i="'+i+'"')+'>'+R(it)+'</span></div>'; }).join('')+'</div></div>');
+  }
+  if(s.type==='usage'){
+    var nt = (s.tiles||[]).length;
+    return wrap('alt', '<div class="pad">'+head()+body()+'<div class="tiles'+((nt%3===0)?'':' c2')+'">'+(s.tiles||[]).map(function(t,i){ return '<div class="tile">'+ph(t.images, G, 'sq')+'<div class="tcap"'+C('tilecap',' data-i="'+i+'"')+'>'+T(t.caption)+'</div></div>'; }).join('')+'</div></div>');
+  }
+  if(s.type==='steps'){
+    return wrap('', '<div class="pad">'+head()+(s.groups||[]).map(function(g,gi){
+      return '<div class="group'+(gi===0?' first':'')+'">'+ph(g.images, G, 'sq')+'<div class="group-label"'+C('grouplabel',' data-i="'+gi+'"')+'>'+T(g.label)+'</div>'+
+        (g.steps||[]).map(function(st,si){ return '<div class="step"><span class="sn">'+numLabel(si+1)+'</span><span'+RC('stepcap',' data-i="'+gi+'" data-j="'+si+'"')+'>'+R(st.caption)+'</span></div>'; }).join('')+'</div>';
+    }).join('')+'</div>');
+  }
+  if(s.type==='trust'){
+    return wrap('alt', '<div class="pad">'+head()+body()+'<div class="badges">'+(s.badges||[]).map(function(b,i){ return '<div class="badge"'+C('badge',' data-i="'+i+'"')+'>'+T(b)+'</div>'; }).join('')+'</div>'+ph(s.images, G, '')+'</div>');
+  }
+  if(s.type==='story'){
+    var purl = brand.portraitId && src(brand.portraitId);
+    return wrap('', '<div class="pad">'+(purl ? (o.cap ? '<div class="portrait" style="background-image:url(\''+purl+'\')"></div>' : '<div class="portrait"><img src="'+purl+'" alt="'+esc(brand.name)+' 대표"></div>') : '')+
+      '<div class="kicker">BRAND STORY</div>'+(s.quote ? '<div class="quote"><span'+C('quote')+'>'+T(s.quote)+'</span></div>' : '')+body()+'</div>');
+  }
+  if(s.type==='reviews'){
+    var shots = (s.images||[]).filter(function(im){ return src(im.id); });
+    return wrap('', '<div class="pad">'+head()+'<div class="revs">'+(s.reviews||[]).map(function(r,i){ return '<div class="rev"><div class="stars">★★★★★</div><div class="q"'+RC('review',' data-i="'+i+'"')+'>'+R(r.quote)+'</div></div>'; }).join('')+'</div>'+
+      (shots.length ? '<div class="shots'+(shots.length===1?' one':'')+'">'+shots.map(function(im){ return ph([im], '', 'sq'); }).join('')+'</div>' : '')+'</div>');
+  }
+  if(s.type==='stats'){
+    var st = s.stat || {bigNumber:'', bigLabel:'', pct:0, pctLabel:'', closingLine:''}, big = plain(st.bigNumber||'');
+    if(o.t!=null){ var bm = /^(\s*)(\d{1,6})(?![\d.,])([\s\S]*)$/.exec(big); if(bm) big = bm[1]+Math.round((+bm[2])*o.t)+bm[3]; }
+    return wrap('dark', '<div class="pad">'+(big ? '<div class="bignum"'+C('bignum')+'>'+esc(big)+'</div>' : '')+(st.bigLabel ? '<div class="biglabel"'+C('biglabel')+'>'+T(st.bigLabel)+'</div>' : '')+
+      ((Number(st.pct)||0)>0 ? graphHtml(st, o.t) : '')+(st.closingLine ? '<div class="closing"'+C('closing')+'>'+T(st.closingLine)+'</div>' : '')+'</div>');
+  }
+  if(s.type==='awards'){
+    var pl = [], foot = '';
+    (s.items||[]).forEach(function(it,i){ var am = String(it).match(/^\s*(\d{4})\s*(.*)$/); if(am) pl.push('<div class="yr">'+esc(am[1])+'</div><div class="pname"'+C('awardname',' data-i="'+i+'"')+'>'+T(am[2])+'</div>'); else foot += '<div class="award-foot"'+C('item',' data-i="'+i+'"')+'>'+T(it)+'</div>'; });
+    var ai = brand.awardImgs.filter(function(im){ return src(im.id); });
+    return wrap('alt', '<div class="pad"><div class="eyebrow">AWARDS</div>'+head()+body()+(pl.length ? '<div class="plaques">'+pl.map(function(h,i){ return '<div class="plaque'+(i===pl.length-1?' last':'')+'">'+h+'</div>'; }).join('')+'</div>' : '')+foot+
+      (ai.length ? '<div class="grid2'+(ai.length===1?' one':'')+'">'+ai.map(function(im){ return ph([im], '', ''); }).join('')+'</div>' : '')+'</div>');
+  }
+  if(s.type==='media'){
+    var tv = brand.mediaImgs.filter(function(im){ return src(im.id); }), tn = tv.length;
+    return wrap('', '<div class="pad"><div><div class="onair"><i></i>ON AIR</div></div>'+head()+body()+
+      ((s.items||[]).length ? '<div class="progs">'+s.items.map(function(it,i){ return '<div class="prog"'+C('item',' data-i="'+i+'"')+'>'+T(it)+'</div>'; }).join('')+'</div>' : '')+
+      (tn ? '<div class="tvs">'+tv.map(function(im,i){ return '<div'+((tn===1 || (tn%2===1 && i===0)) ? ' class="lead"' : '')+'>'+ph([im], '', 'wide')+'</div>'; }).join('')+'</div>' : '')+'</div>');
+  }
+  if(s.type==='cta'){
+    return wrap('', '<div class="pad">'+(s.eyebrow ? '<div class="eyebrow"'+C('eyebrow')+'>'+T(s.eyebrow)+'</div>' : '')+head(66)+
+      ((s.items||[]).length ? '<div class="recap">'+s.items.map(function(it,i){ return '<div class="recap-item"><span class="rn">'+numLabel(i+1)+'</span><span'+RC('item',' data-i="'+i+'"')+'>'+R(it)+'</span></div>'; }).join('')+'</div>' : '')+
+      ph(s.images, G, '')+(s.body ? '<div class="signoff"'+C('body')+'>'+T(s.body)+'</div>' : '')+logo()+(s.tagline ? '<div><div class="cta-pill"'+C('tagline')+'>'+T(s.tagline)+'</div></div>' : '')+'</div>');
+  }
+  if(s.type==='shipping'){
+    return wrap('alt', '<div class="pad">'+head()+body()+((s.icons||[]).length ? '<div class="ships">'+s.icons.map(function(ic,i){ return '<div class="ship">'+(ic.icon ? '<div class="ic">'+esc(ic.icon)+'</div>' : '')+'<div class="il"'+C('iconlabel',' data-i="'+i+'"')+'>'+T(ic.label)+'</div>'+(ic.desc ? '<div class="id"'+C('icondesc',' data-i="'+i+'"')+'>'+T(ic.desc)+'</div>' : '')+'</div>'; }).join('')+'</div>' : '')+
+      (s.tagline ? '<div class="ship-note"'+C('tagline')+'>'+T(s.tagline)+'</div>' : '')+'</div>');
+  }
+  if(s.type==='label'){
+    var rows = (s.fields||[]).map(function(f,i){ if(!o.edit && !String(f.v||'').trim()) return ''; return '<tr><td class="k">'+esc(f.k)+'</td><td class="v"'+C('fieldv',' data-i="'+i+'"')+'>'+esc(f.v)+'</td></tr>'; }).join('');
+    return wrap('', '<div class="pad"><div class="headline"'+C('title')+'>'+T(s.title||'제품 표시사항')+'</div><table>'+rows+'</table></div>');
+  }
+  return wrap('', '<div class="pad">'+head()+body()+'</div>');
+}
+function dpOpen(extraStyle){ return '<div class="dp t-'+themeOf()+'" style="'+themeVars()+(extraStyle||'')+'">'; }
+
+// ================= 화면 폭에 맞춰 미리보기 크기 맞추기 =================
+function setU(root){
+  Array.prototype.forEach.call((root||document).querySelectorAll('.dp'), function(el){
+    if(el.closest('#capHost')) return;
+    var w = el.clientWidth; if(w) el.style.setProperty('--u', (w/860)+'px');
+  });
+}
+window.addEventListener('resize', debounce(function(){ setU(); }, 120));
+
+// ================= 탭 =================
+var curTab = '';
+function switchTab(name){
+  curTab = name;
+  Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function(b){ b.classList.toggle('active', b.dataset.tab===name); });
+  Array.prototype.forEach.call(document.querySelectorAll('.panel'), function(p){ p.classList.toggle('active', p.id==='panel-'+name); });
+  if(name==='brand'){ renderBrandTab(); }
+  if(name==='plan'){ renderPicker(); renderLabelGrid(); renderPlanResult(); }
+  if(name==='images') renderImagesTab();
+  if(name==='finish') renderFinishTab();
+  if(name==='spec') renderSpecTab();
+  setU();
+  window.scrollTo(0, 0);
+}
+document.querySelector('.tabs').addEventListener('click', function(e){ var b = e.target.closest('.tab-btn'); if(b) switchTab(b.dataset.tab); });
+
+// ================= 입력 칸 연결 =================
+function fillForms(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-b]'), function(el){ el.value = brand[el.dataset.b]==null ? '' : brand[el.dataset.b]; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-m]'), function(el){ el.value = state.meta[el.dataset.m]==null ? '' : state.meta[el.dataset.m]; });
+  $('bShowLogo').checked = brand.showLogo!==false;
+  $('cafeBase').value = brand.cafeBase||'';
+  var mr = document.querySelector('input[name="cafeMotion"][value="'+(brand.cafeMotion||'light')+'"]'); if(mr) mr.checked = true;
+}
+// 브랜드 설정을 고치면 이미 만든 섹션 중 브랜드 자료로 채운 것도 함께 바뀜
+function syncBrandIntoSections(){
+  state.sections.forEach(function(s){
+    if(s.type==='awards') s.items = lines(brand.awards);
+    if(s.type==='media') s.items = lines(brand.media);
+    if(s.type==='story'){ s.quote = brand.storyQuote; s.body = brand.storyBody; }
+    if(s.type==='stats'){ var st = statFromBrand(); if(st) s.stat = st; }
+    if(s.type==='trust') s.badges = lines(brand.certs).slice(0,4);
+    if(s.type==='shipping'){ s.title = brand.shipTitle; s.body = brand.shipBody; s.icons = parseIcons(brand.shipIcons); }
+  });
+}
+var refreshPreview = debounce(function(){ renderThemePreview(); }, 200);
+document.addEventListener('input', function(e){
+  var el = e.target;
+  if(el.dataset && el.dataset.b){ brand[el.dataset.b] = el.value; syncBrandIntoSections(); refreshPreview(); save(); }
+  else if(el.dataset && el.dataset.m){ state.meta[el.dataset.m] = el.value; if(el.dataset.m==='productName') pickerNote(); save(); }
+  else if(el.dataset && el.dataset.lf!=null){ var f = labelFieldsOf()[+el.dataset.lf]; if(f){ f.v = el.value; syncLabelToSection(); save(); } }
+});
+$('bShowLogo').addEventListener('change', function(){ brand.showLogo = this.checked; save(); });
+function syncLabelToSection(){ state.sections.forEach(function(s){ if(s.type==='label') s.fields = clone(labelFieldsOf()); }); }
+
+// ================= 0. 브랜드 설정 =================
+function renderBrandTab(){ renderThemePick(); renderBrandImgs(); renderThemePreview(); }
+function renderThemePick(){
+  $('themePick').innerHTML = Object.keys(THEMES).map(function(k){ var t = THEMES[k]; return '<button type="button" class="theme-opt'+(themeOf()===k?' on':'')+'" role="radio" aria-checked="'+(themeOf()===k)+'" data-theme="'+k+'"><b>'+t.name+'</b><span>'+t.desc+'</span></button>'; }).join('');
+  $('swatches').innerHTML = SWATCHES.map(function(c){ return '<button type="button" class="sw'+(brand.accent.toUpperCase()===c?' on':'')+'" style="background:'+c+'" data-color="'+c+'" aria-label="대표 색 '+c+'"></button>'; }).join('')+
+    '<label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--dim);"><input type="color" id="accentPick" value="'+esc(rgbHex(hexRgb(brand.accent)))+'"> 직접 고르기</label>';
+}
+function renderThemePreview(){
+  var a = newSection('feature', {title:(state.meta.productName||'제품 특징 제목')+'은 이렇게 보여요', body:'설명 글은 이 크기와 색으로 들어가요. **강조한 단어**는 이렇게 표시돼요.'});
+  var b = newSection('stats', {stat: statFromBrand() || {bigNumber:'00%', bigLabel:'확인된 수치를 입력하면 통계 섹션이 생겨요 (예시 모양)', pct:75, pctLabel:'그래프 이름', closingLine:''}});
+  var c = newSection('recommend', {title:'목록은 이렇게 보여요', items:['추천 대상이나 요약이 들어가는 줄']});
+  $('themePreview').innerHTML = dpOpen()+renderSec(a, -1, {})+renderSec(b, -1, {})+renderSec(c, -1, {})+'</div>';
+  setU($('themePreview'));
+}
+function applyDesign(){ renderThemePick(); renderThemePreview(); save(); }
+$('themePick').addEventListener('click', function(e){ var b = e.target.closest('[data-theme]'); if(!b) return; brand.theme = b.dataset.theme; applyDesign(); });
+$('swatches').addEventListener('click', function(e){ var b = e.target.closest('[data-color]'); if(!b) return; brand.accent = b.dataset.color; applyDesign(); });
+$('swatches').addEventListener('input', function(e){ if(e.target.id==='accentPick'){ brand.accent = e.target.value.toUpperCase(); renderThemePreview(); save(); } });
+$('swatches').addEventListener('change', function(e){ if(e.target.id==='accentPick') renderThemePick(); });
+
+var BRAND_IMG = { logo:{single:'logoId', contain:true, label:'로고 올리기'}, portrait:{single:'portraitId', label:'사진 올리기'}, award:{list:'awardImgs', label:'사진 추가'}, media:{list:'mediaImgs', label:'캡처 추가'} };
+function brandImgBoxHtml(key){
+  var d = BRAND_IMG[key], ids = d.single ? (brand[d.single] ? [brand[d.single]] : []) : brand[d.list].map(function(x){ return x.id; });
+  var h = ids.filter(imgUrl).map(function(id, i){ return '<div class="thumb'+(d.contain?' contain':'')+'"><img src="'+imgUrl(id)+'" alt=""><button type="button" class="x" data-bkey="'+key+'" data-i="'+i+'" aria-label="사진 빼기">×</button></div>'; }).join('');
+  if(!d.single || !ids.filter(imgUrl).length) h += '<label class="drop sm" data-bdrop="'+key+'">'+d.label+'<input type="file" accept="image/*" '+(d.single?'':'multiple')+' data-bfile="'+key+'" hidden></label>';
+  return h;
+}
+function renderBrandImgs(){
+  $('logoBox').innerHTML = brandImgBoxHtml('logo'); $('portraitBox').innerHTML = brandImgBoxHtml('portrait');
+  $('awardImgBox').innerHTML = brandImgBoxHtml('award'); $('mediaImgBox').innerHTML = brandImgBoxHtml('media');
+  Array.prototype.forEach.call(document.querySelectorAll('[data-bdrop]'), function(el){ wireDrop(el, function(files){ addBrandImgs(el.dataset.bdrop, files); }); });
+}
+function addBrandImgs(key, files){
+  var d = BRAND_IMG[key]; if(d.single) files = files.slice(0,1);
+  return files.reduce(function(p, f){ return p.then(function(){ return addImage(f).then(function(id){ if(d.single) brand[d.single] = id; else brand[d.list].push({id:id}); }); }); }, Promise.resolve())
+    .then(function(){ renderBrandImgs(); renderThemePreview(); save(); });
+}
+$('panel-brand').addEventListener('change', function(e){ var k = e.target.dataset && e.target.dataset.bfile; if(!k) return; var f = imageFiles(e.target.files); if(f.length) addBrandImgs(k, f); });
+$('panel-brand').addEventListener('click', function(e){
+  var x = e.target.closest('.x[data-bkey]'); if(!x) return;
+  var d = BRAND_IMG[x.dataset.bkey]; if(d.single) brand[d.single] = ''; else brand[d.list].splice(+x.dataset.i, 1);
+  renderBrandImgs(); save();
+});
+
+// ================= 1. 제품 정보·기획안 =================
+function pickerNote(){
+  var key = productKey(), el = $('pickerStatus'); if(!el) return;
+  el.textContent = key ? '지금 작업: '+key+' (자동 저장)' : '제품명을 적으면 그 이름으로 자동 저장돼요.';
+}
+function renderPicker(){
+  var keys = Object.keys(products).sort();
+  $('selProduct').innerHTML = '<option value="">저장된 제품 열기 ('+keys.length+'개)</option>'+keys.map(function(k){ var p = products[k]; return '<option value="'+esc(k)+'"'+(k===productKey()?' selected':'')+'>'+esc(k)+(p.sections && p.sections.length ? ' · 상세페이지 보관됨' : '')+'</option>'; }).join('');
+  pickerNote();
+}
+function openProduct(key){
+  if(!products[key]) return;
+  clearTimeout(saveTimer);
+  return saveNow().then(function(){
+    state = clone({meta:products[key].meta, sections:products[key].sections||[]});
+    var d = defaultMeta(); for(var k in d){ if(state.meta[k]===undefined) state.meta[k] = d[k]; }
+    fillForms(); save(); switchTab(curTab||'plan'); toast('"'+key+'" 을 열었어요.');
+  });
+}
+$('selProduct').addEventListener('change', function(){ if(this.value) openProduct(this.value); });
+$('btnNewProduct').addEventListener('click', function(){
+  clearTimeout(saveTimer);
+  saveNow().then(function(){ state = {meta:defaultMeta(), sections:[]}; fillForms(); save(); switchTab('plan'); toast('새 제품을 시작해요. 전에 하던 작업은 저장돼 있어요.'); });
+});
+function renderLabelGrid(){
+  fillLabelDefaults(state.meta);
+  $('labelGrid').innerHTML = labelFieldsOf().map(function(f, i){ return '<label class="k" for="lf'+i+'">'+esc(f.k)+'</label><input class="input" id="lf'+i+'" data-lf="'+i+'" value="'+esc(f.v)+'">'; }).join('');
+}
+// 붙여넣은 글에서 "항목 - 값", "항목: 값" 줄을 찾아 칸에 채움 (값을 지어내지 않고 적힌 그대로만)
+var LABEL_ALIAS = {'식품의 유형':'식품유형','식품 유형':'식품유형','품목제조보고번호':'품목보고번호','품목보고 번호':'품목보고번호','제조업소':'제조원','제조원 및 소재지':'제조원','제조원 및 판매원':'제조원','유통판매원':'유통전문판매원','유통기한':'소비기한','보관 방법':'보관방법','보관상 주의사항':'보관방법','원재료명 및 함량':'원재료명','원재료 및 함량':'원재료명','원재료':'원재료명','알레르기':'알레르기 함유','알레르기 유발물질':'알레르기 함유','반품 및 교환':'반품 및 교환장소','고객센터':'소비자상담실','소비자 상담실':'소비자상담실'};
+$('btnParseLabel').addEventListener('click', function(){
+  var raw = $('labelRaw').value, f = labelFieldsOf(), names = LABEL_KEYS.concat(Object.keys(LABEL_ALIAS)).sort(function(a,b){ return b.length-a.length; }), last = null, n = 0;
+  raw.split('\n').forEach(function(l){
+    var t = l.replace(/^[\s\-•·*■▶]+/,'').trim(); if(!t) return;
+    var hit = null;
+    for(var i=0;i<names.length;i++){ if(t.indexOf(names[i])===0 && /^[\s\-:：=\t]/.test(t.slice(names[i].length)||' ')){ hit = names[i]; break; } }
+    if(hit){
+      var key = LABEL_ALIAS[hit] || hit, val = t.slice(hit.length).replace(/^[\s\-:：=\t]+/,'').trim();
+      last = f.filter(function(x){ return x.k===key; })[0];
+      if(last && val){ last.v = val; n++; }
+    } else if(last){ last.v = (last.v ? last.v+' ' : '')+t; }
+  });
+  syncLabelToSection(); renderLabelGrid(); save();
+  $('labelParseStatus').textContent = n ? n+'개 항목을 채웠어요. 포장지 표시와 같은지 확인해주세요.' : '항목 이름(식품유형, 원재료명 등)으로 시작하는 줄을 찾지 못했어요.';
+});
+function renderPlanResult(){
+  var el = $('planResult');
+  if(!state.sections.length){ el.innerHTML = ''; $('buildStatus').textContent = '제품명과 첫 화면 한 줄만 있어도 만들 수 있어요.'; return; }
+  var warnN = 0;
+  el.innerHTML = '<div class="note">아래 순서로 '+state.sections.length+'개 섹션을 배치했어요. 2단계에서 사진을 올리고, 3단계에서 문구를 다듬고 순서를 바꿀 수 있어요.</div>'+
+    state.sections.map(function(s, i){
+      var w = warningsOf(s); warnN += w.length;
+      var d = plain(s.title || s.quote || (s.tiles[0] && s.tiles[0].caption) || (s.stat && s.stat.bigNumber) || '');
+      return '<div class="plan-item"><span class="plan-no">'+(i+1)+'</span><div><div class="t">'+esc(sectionName(s))+(d ? ' · '+esc(d) : '')+'</div><div class="d">'+esc(TYPES[s.type].tip)+'</div>'+warnHtml(s)+'</div></div>';
+    }).join('')+
+    '<div class="btn-row"><button class="btn btn-primary" type="button" data-goto="images">2단계 사진 올리기로</button><button class="btn" type="button" data-goto="finish">3단계 다듬기로</button></div>';
+  $('buildStatus').textContent = warnN ? '표현 주의 '+warnN+'건이 있어요. 아래에서 확인해주세요.' : '';
+}
+$('planResult').addEventListener('click', function(e){ var b = e.target.closest('[data-goto]'); if(b) switchTab(b.dataset.goto); });
+$('btnBuild').addEventListener('click', function(){
+  var btn = this;
+  if(!state.meta.productName.trim()){ toast('제품명을 먼저 적어주세요.'); $('mName').focus(); return; }
+  var go = function(){ state.sections = buildSections(); state.meta.aeoEdited = false; save(); renderLabelGrid(); renderPlanResult(); renderPicker(); toast('기획안을 만들었어요.'); };
+  if(state.sections.length) armTwice(btn, '한 번 더 누르면 다시 짜요 (3단계에서 고친 문구는 입력값으로 바뀌고 사진은 유지)', go); else go();
+});
+
+// ================= 2. 사진 올리기 =================
+function slotsOf(s){
+  var G = TYPES[s.type].guide||'', out = [];
+  if({hero:1, banner:1, feature:1, compare:1, trust:1, cta:1}[s.type]) out.push({label:'사진 1장', arr:s.images, max:1, guide:G});
+  if(s.type==='reviews') out.push({label:'후기 캡처 (최대 4장 · 선택)', arr:s.images, max:4, guide:G});
+  if(s.type==='gallery' || s.type==='usage') s.tiles.forEach(function(t){ t.images = t.images||[]; out.push({label:'"'+plain(t.caption)+'"', arr:t.images, max:1, guide:G}); });
+  if(s.type==='steps') s.groups.forEach(function(g){ g.images = g.images||[]; out.push({label:plain(g.label), arr:g.images, max:1, guide:G}); });
+  return out;
+}
+function renderImagesTab(){
+  var el = $('imagesList');
+  if(!state.sections.length){ el.innerHTML = '<div class="card"><p class="hint">먼저 1단계에서 "기획안 만들기"를 눌러주세요.</p></div>'; return; }
+  el.innerHTML = state.sections.map(function(s, i){
+    var slots = slotsOf(s); if(!slots.length) return '';
+    return '<div class="card"><h3><span class="sec-tag">'+(i+1)+'</span>'+esc(sectionName(s))+(s.title ? ' · '+esc(plain(s.title)) : '')+'</h3>'+
+      slots.map(function(sl, k){
+        return '<div class="slot-row"><div class="lab">'+esc(sl.label)+'</div><div class="hint" style="margin:0;">'+esc(sl.guide)+'</div><div class="thumbs">'+
+          sl.arr.filter(function(im){ return imgUrl(im.id); }).map(function(im, j){ return '<div class="thumb"><img src="'+imgUrl(im.id)+'" alt=""><button type="button" class="x" data-sid="'+s.id+'" data-slot="'+k+'" data-j="'+j+'" aria-label="사진 빼기">×</button></div>'; }).join('')+
+          (sl.arr.length < sl.max ? '<label class="drop sm" data-sdrop="'+s.id+'|'+k+'">사진 올리기<input type="file" accept="image/*" '+(sl.max>1?'multiple':'')+' data-sfile="'+s.id+'|'+k+'" hidden></label>' : '')+'</div></div>';
+      }).join('')+'</div>';
+  }).join('')+'<div class="card"><p class="hint" style="margin:0;">로고 · 대표 사진 · 수상 사진 · 방송 화면은 모든 제품에 공통이라 <b>브랜드 설정</b>에서 올려요.</p></div>';
+  Array.prototype.forEach.call(el.querySelectorAll('[data-sdrop]'), function(d){ wireDrop(d, function(files){ addSlotImgs(d.dataset.sdrop, files); }); });
+}
+function addSlotImgs(ref, files){
+  var p = ref.split('|'), s = findSection(p[0]); if(!s) return;
+  var sl = slotsOf(s)[+p[1]]; if(!sl) return;
+  files = files.slice(0, sl.max - sl.arr.length);
+  return files.reduce(function(pr, f){ return pr.then(function(){ return addImage(f).then(function(id){ sl.arr.push({id:id}); }); }); }, Promise.resolve()).then(function(){ renderImagesTab(); save(); });
+}
+$('imagesList').addEventListener('change', function(e){ var r = e.target.dataset && e.target.dataset.sfile; if(!r) return; var f = imageFiles(e.target.files); if(f.length) addSlotImgs(r, f); });
+$('imagesList').addEventListener('click', function(e){
+  var x = e.target.closest('.x[data-sid]'); if(!x) return;
+  var s = findSection(x.dataset.sid), sl = s && slotsOf(s)[+x.dataset.slot]; if(!sl) return;
+  var shown = sl.arr.filter(function(im){ return imgUrl(im.id); })[+x.dataset.j]; var at = sl.arr.indexOf(shown); if(at>=0) sl.arr.splice(at, 1);
+  renderImagesTab(); save();
+});
+function bulkUpload(files){
+  var empty = []; state.sections.forEach(function(s){ slotsOf(s).forEach(function(sl){ if(!sl.arr.length) empty.push(sl); }); });
+  if(!empty.length){ toast('비어 있는 사진 칸이 없어요.'); return; }
+  files = files.slice().sort(function(a,b){ return String(a.name).localeCompare(String(b.name), 'ko', {numeric:true}); }).slice(0, empty.length);
+  toast('사진 '+files.length+'장을 올리는 중…', 60000);
+  files.reduce(function(p, f, i){ return p.then(function(){ return addImage(f).then(function(id){ empty[i].arr.push({id:id}); }); }); }, Promise.resolve())
+    .then(function(){ renderImagesTab(); save(); toast('사진 '+files.length+'장을 빈 칸에 차례로 넣었어요.'); });
+}
+$('bulkFile').addEventListener('change', function(){ var f = imageFiles(this.files); if(f.length) bulkUpload(f); this.value=''; });
+wireDrop($('bulkDrop'), bulkUpload);
+
+// ================= 3. 카피 다듬기 =================
+var FORM = {
+  hero:[['eyebrow','작은 라벨'],['title','메인 카피'],['subtitle','보조 카피'],['badges','배지 (줄마다 하나)','lines']],
+  banner:[['title','굵은 카피'],['subtitle','보조 카피']],
+  feature:[['title','특징 제목'],['body','설명','area']],
+  gallery:[['eyebrow','작은 라벨 (선택)'],['title','제목 (선택)'],['tiles','사진별 문구 (줄마다 하나 = 사진 한 장)','tiles']],
+  compare:[['title','제목'],['body','설명','area'],['tagline','강조 문구']],
+  recommend:[['title','제목'],['items','추천 대상 (줄마다 하나)','lines']],
+  usage:[['title','제목'],['body','소개 글 (선택)','area'],['tiles','활용 방법 (줄마다 하나 = 사진 한 장)','tiles']],
+  story:[['quote','한 줄 인용구'],['body','이야기','area']],
+  awards:[['title','제목'],['body','소개 글 (선택)','area'],['items','수상·인증 (줄마다 하나 · 연도로 시작하면 연도 표시)','lines']],
+  media:[['title','제목'],['body','소개 글 (선택)','area'],['items','방송·언론 (줄마다 하나)','lines']],
+  steps:[['title','제목'],['groups','조리법 ("## 이름" 아래 줄마다 한 단계)','groups']],
+  trust:[['title','제목'],['body','설명','area'],['badges','배지 (줄마다 하나)','lines']],
+  reviews:[['title','제목'],['reviews','후기 (줄마다 하나)','reviews']],
+  stats:[['stat.bigNumber','큰 숫자'],['stat.bigLabel','큰 숫자 설명'],['stat.pct','그래프 수치 (0~100)'],['stat.pctLabel','그래프 이름'],['stat.closingLine','마무리 한 줄']],
+  cta:[['eyebrow','작은 라벨'],['title','마무리 제목'],['items','핵심 요약 (줄마다 하나 · 3개 권장)','lines'],['body','마무리 한마디','area'],['tagline','버튼 문구']],
+  shipping:[['title','제목'],['body','본문','area'],['icons','안내 카드 (줄마다 "아이콘 | 제목 | 설명")','icons'],['tagline','보충 안내','area']],
+  label:[['title','제목'],['fields','표시사항 (줄마다 "항목: 값")','fields']]
+};
+function formValue(s, key, kind){
+  if(key.indexOf('stat.')===0) return (s.stat||{})[key.slice(5)];
+  var v = s[key];
+  if(kind==='lines') return (v||[]).join('\n');
+  if(kind==='reviews') return (v||[]).map(function(r){ return r.quote; }).join('\n');
+  if(kind==='tiles') return (v||[]).map(function(t){ return t.caption; }).join('\n');
+  if(kind==='groups') return (v||[]).map(function(g){ return '## '+g.label+'\n'+(g.steps||[]).map(function(x){ return x.caption; }).join('\n'); }).join('\n\n');
+  if(kind==='fields') return (v||[]).map(function(f){ return f.k+': '+f.v; }).join('\n');
+  if(kind==='icons') return (v||[]).map(function(ic){ return [ic.icon, ic.label, ic.desc].join(' | '); }).join('\n');
+  return v;
+}
+function formHtml(s){
+  return (FORM[s.type]||[]).map(function(d, i){
+    var v = formValue(s, d[0], d[2]), id = 'ff_'+s.id+'_'+i, big = d[2] && d[2]!=='text';
+    return '<div class="field" style="margin-top:8px;"><label for="'+id+'">'+esc(d[1])+'</label>'+(big ? '<textarea class="input" id="'+id+'" data-k="'+d[0]+'" data-kind="'+d[2]+'">'+esc(v==null?'':v)+'</textarea>' : '<input class="input" id="'+id+'" data-k="'+d[0]+'" data-kind="text" value="'+esc(v==null?'':v)+'">')+'</div>';
+  }).join('')+'<div class="hint">'+esc(TYPES[s.type].tip)+'</div><div class="btn-row"><button type="button" class="btn btn-primary btn-sm" data-act="apply">적용</button><button type="button" class="btn btn-sm btn-ghost" data-act="closeform">닫기</button></div>';
+}
+function applyForm(s, box){
+  Array.prototype.forEach.call(box.querySelectorAll('[data-k]'), function(el){
+    var k = el.dataset.k, kind = el.dataset.kind, v = el.value;
+    if(k.indexOf('stat.')===0){ s.stat = s.stat || {}; var sk = k.slice(5); s.stat[sk] = sk==='pct' ? Math.max(0, Math.min(100, parseFloat(v)||0)) : v; return; }
+    if(kind==='lines') s[k] = lines(v);
+    else if(kind==='reviews') s[k] = lines(v).map(function(q){ return {quote:q}; });
+    else if(kind==='tiles'){ var old = s.tiles||[]; s.tiles = lines(v).map(function(c, i){ return {caption:c, images:(old[i] && old[i].images)||[]}; }); }
+    else if(kind==='groups'){ var og = s.groups||[]; s.groups = parseRecipes(v).map(function(g, i){ g.images = (og[i] && og[i].images)||[]; return g; }); }
+    else if(kind==='fields'){ s[k] = String(v).split('\n').map(function(l){ var i = l.search(/[:：]/); return i<0 ? null : {k:l.slice(0,i).trim(), v:l.slice(i+1).trim()}; }).filter(function(f){ return f && f.k; }); }
+    else if(kind==='icons') s[k] = parseIcons(v);
+    else s[k] = v;
+  });
+  if(s.type==='label') state.meta.labelFields = clone(s.fields);
+}
+function wrapHtml(s, i){
+  return '<div class="sc-wrap" data-sid="'+s.id+'"><div class="sc-bar"><span class="nm">'+(i+1)+'. '+esc(sectionName(s))+'</span><span class="acts">'+
+    '<button type="button" class="btn btn-sm" data-act="up" aria-label="위로">↑</button><button type="button" class="btn btn-sm" data-act="down" aria-label="아래로">↓</button>'+
+    '<button type="button" class="btn btn-sm" data-act="edit">항목 고치기</button><button type="button" class="btn btn-sm" data-act="dl">이미지 받기</button><button type="button" class="btn btn-sm btn-ghost btn-danger" data-act="del">지우기</button></span></div>'+
+    '<div class="sc-form" hidden></div>'+dpOpen()+renderSec(s, i, {edit:true})+'</div><div class="sc-extra">'+warnHtml(s)+'</div></div>';
+}
+function renderOutline(){
+  $('finishOutline').innerHTML = state.sections.map(function(s, i){ return '<a href="#" data-go="'+s.id+'"'+(warningsOf(s).length ? ' class="w" title="표현 주의"' : '')+'>'+(i+1)+' '+esc(sectionName(s))+'</a>'; }).join('');
+}
+function renderFinishTab(){
+  $('addType').innerHTML = TYPE_ORDER.map(function(t){ return '<option value="'+t+'">'+TYPES[t].label+'</option>'; }).join('');
+  renderOutline();
+  $('pageStack').innerHTML = state.sections.length ? state.sections.map(wrapHtml).join('') : '<div class="card"><p class="hint" style="margin:0;">먼저 1단계에서 "기획안 만들기"를 눌러주세요.</p></div>';
+  setU($('pageStack'));
+  if(!state.meta.aeoEdited || !state.meta.aeoText) state.meta.aeoText = buildAeoDraft();
+  $('aeoText').value = state.meta.aeoText;
+  renderThumbPicker();
+}
+function sectionIndex(id){ return state.sections.findIndex(function(x){ return x.id===id; }); }
+function blankSection(type){
+  var t3 = function(n){ var a = []; for(var i=1;i<=n;i++) a.push({caption:'문구 '+i, images:[]}); return a; };
+  var d = {
+    hero:{title:state.meta.heroTitle||'메인 카피', subtitle:state.meta.heroSub}, banner:{title:'굵은 한 줄'}, feature:{title:'특징 제목', body:'설명을 적어주세요.'},
+    gallery:{tiles:t3(1)}, compare:{title:'차별점 제목', body:'설명을 적어주세요.'}, recommend:{title:'이런 분들께 추천드려요', items:['추천 대상 1','추천 대상 2']},
+    usage:{title:'이렇게 즐겨보세요', tiles:t3(3)}, story:{quote:brand.storyQuote||'한 줄 인용구', body:brand.storyBody||'브랜드 이야기를 적어주세요.'},
+    awards:{title:'수상 및 인증 이력', items:lines(brand.awards)}, media:{title:'방송에서도 소개됐어요', items:lines(brand.media)},
+    steps:{title:'맛있게 즐기는 방법', groups:[{label:'조리 방법', steps:[{caption:'첫 단계를 적어주세요'}], images:[]}]}, trust:{title:'믿고 드실 수 있도록', badges:lines(brand.certs).slice(0,4)},
+    reviews:{title:'먼저 드셔 본 분들의 이야기', reviews:[{quote:'실제 고객 후기를 옮겨 적어주세요.'}]}, stats:{stat:statFromBrand()},
+    cta:{eyebrow:brand.en||brand.name, title:'마무리 제목', items:[], body:brand.tagline, tagline:'지금 바로 만나보세요'},
+    shipping:{title:brand.shipTitle||'배송·보관 안내', body:brand.shipBody, icons:parseIcons(brand.shipIcons)}, label:{title:'제품 표시사항', fields:clone(labelFieldsOf())}
+  };
+  return newSection(type, d[type]||{});
+}
+$('btnAddSection').addEventListener('click', function(){
+  var type = $('addType').value;
+  if(type==='stats' && !statFromBrand()){ toast('통계 섹션은 브랜드 설정의 "확인된 수치"를 입력해야 만들 수 있어요.', 4500); return; }
+  var s = blankSection(type), at = state.sections.findIndex(function(x){ return {cta:1, shipping:1, label:1}[x.type]; });
+  if(at<0 || {cta:1, shipping:1, label:1, hero:1}[type]) at = type==='hero' ? 0 : state.sections.length;
+  state.sections.splice(at, 0, s); save(); renderFinishTab();
+  var w = document.querySelector('.sc-wrap[data-sid="'+s.id+'"]'); if(w){ w.scrollIntoView({block:'start'}); openForm(w, s); }
+});
+function openForm(w, s){ var f = w.querySelector('.sc-form'); f.innerHTML = formHtml(s); f.hidden = false; }
+$('finishOutline').addEventListener('click', function(e){ var a = e.target.closest('[data-go]'); if(!a) return; e.preventDefault(); var w = document.querySelector('.sc-wrap[data-sid="'+a.dataset.go+'"]'); if(w) w.scrollIntoView({block:'start'}); });
+$('pageStack').addEventListener('click', function(e){
+  var b = e.target.closest('[data-act]'); if(!b) return;
+  var w = b.closest('.sc-wrap'), s = findSection(w.dataset.sid), i = sectionIndex(w.dataset.sid), act = b.dataset.act; if(!s) return;
+  if(act==='up' || act==='down'){
+    var j = i + (act==='up' ? -1 : 1); if(j<0 || j>=state.sections.length) return;
+    state.sections.splice(i, 1); state.sections.splice(j, 0, s); save(); renderFinishTab();
+    var nw = document.querySelector('.sc-wrap[data-sid="'+s.id+'"]'); if(nw) nw.scrollIntoView({block:'center'});
+  }
+  if(act==='edit'){ var f = w.querySelector('.sc-form'); if(f.hidden) openForm(w, s); else f.hidden = true; }
+  if(act==='closeform'){ w.querySelector('.sc-form').hidden = true; }
+  if(act==='apply'){ applyForm(s, w.querySelector('.sc-form')); save(); renderFinishTab(); var aw = document.querySelector('.sc-wrap[data-sid="'+s.id+'"]'); if(aw) aw.scrollIntoView({block:'start'}); toast('고친 내용을 반영했어요.'); }
+  if(act==='del'){ armTwice(b, '한 번 더 누르면 지워요', function(){ state.sections.splice(sectionIndex(s.id), 1); save(); renderFinishTab(); }); }
+  if(act==='dl'){ b.disabled = true; downloadOne(s).catch(function(err){ toast('이미지를 만들지 못했어요. '+(err && err.message ? err.message : '')); }).then(function(){ b.disabled = false; }); }
+});
+// 미리보기에서 바로 고친 글자를 자료에 반영 (다시 그리지 않아 커서가 유지됨)
+var refreshWarn = debounce(function(w, s){ var x = w.querySelector('.sc-extra'); if(x) x.innerHTML = warnHtml(s); renderOutline(); }, 500);
+function syncEditable(el){
+  var w = el.closest('.sc-wrap'); if(!w) return; var s = findSection(w.dataset.sid); if(!s) return;
+  var f = el.dataset.f, i = +el.dataset.i, j = +el.dataset.j;
+  var v = el.dataset.rich ? serializeRich(el, false) : String(el.innerText||'').replace(/ /g,' ');
+  v = v.replace(/\n+$/,'');
+  if({title:1, eyebrow:1, subtitle:1, body:1, tagline:1, quote:1}[f]) s[f] = v;
+  else if(f==='item') s.items[i] = v;
+  else if(f==='awardname'){ var am = String(s.items[i]||'').match(/^\s*(\d{4})/); s.items[i] = (am ? am[1]+' ' : '')+v; }
+  else if(f==='badge') s.badges[i] = v;
+  else if(f==='review') s.reviews[i].quote = v;
+  else if(f==='tilecap') s.tiles[i].caption = v;
+  else if(f==='grouplabel') s.groups[i].label = v;
+  else if(f==='stepcap') s.groups[i].steps[j].caption = v;
+  else if(f==='bignum') s.stat.bigNumber = v;
+  else if(f==='biglabel') s.stat.bigLabel = v;
+  else if(f==='closing') s.stat.closingLine = v;
+  else if(f==='fieldv'){ s.fields[i].v = v; state.meta.labelFields = clone(s.fields); }
+  else if(f==='iconlabel') s.icons[i].label = v;
+  else if(f==='icondesc') s.icons[i].desc = v;
+  save(); refreshWarn(w, s);
+}
+$('pageStack').addEventListener('input', function(e){ if(e.target.matches && e.target.matches('[contenteditable]')) syncEditable(e.target); });
+$('pageStack').addEventListener('paste', function(e){
+  if(!(e.target.closest && e.target.closest('[contenteditable]'))) return;
+  e.preventDefault(); var t = (e.clipboardData || window.clipboardData).getData('text'); try{ document.execCommand('insertText', false, t); }catch(err){}
+});
+// 글자를 끌어 고른 뒤 강조하기 / 강조 빼기
+var hlBar = $('hlBar');
+function hlTarget(){
+  var sel = window.getSelection(); if(!sel || !sel.rangeCount || sel.isCollapsed) return null;
+  var n = sel.getRangeAt(0).commonAncestorContainer; n = n.nodeType===1 ? n : n.parentNode;
+  var host = n && n.closest ? n.closest('#pageStack [data-rich]') : null;
+  return host ? {sel:sel, range:sel.getRangeAt(0), host:host} : null;
+}
+document.addEventListener('selectionchange', debounce(function(){
+  var t = hlTarget(); if(!t){ hlBar.hidden = true; return; }
+  var r = t.range.getBoundingClientRect(); hlBar.hidden = false;
+  hlBar.style.left = Math.max(8, Math.min(window.innerWidth-200, r.left))+'px'; hlBar.style.top = Math.max(60, r.top-46)+'px';
+}, 120));
+hlBar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+$('hlOn').addEventListener('click', function(){
+  var t = hlTarget(); if(!t) return;
+  var m = document.createElement('mark'); m.className = 'hl';
+  try{ m.appendChild(t.range.extractContents()); Array.prototype.forEach.call(m.querySelectorAll('mark'), function(x){ x.replaceWith.apply(x, Array.prototype.slice.call(x.childNodes)); }); t.range.insertNode(m); }catch(e){ return; }
+  t.sel.removeAllRanges(); hlBar.hidden = true; syncEditable(t.host);
+});
+$('hlOff').addEventListener('click', function(){
+  var t = hlTarget(); if(!t) return;
+  Array.prototype.forEach.call(t.host.querySelectorAll('mark'), function(x){ if(t.range.intersectsNode(x)) x.replaceWith.apply(x, Array.prototype.slice.call(x.childNodes)); });
+  t.sel.removeAllRanges(); hlBar.hidden = true; syncEditable(t.host);
+  // 자동 강조(핵심 단어)는 1단계의 "강조할 핵심 단어"에서 빼야 사라져요
+});
+
+// ================= 내보내기: 이미지 =================
+var IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+function safeName(s){ return (s||'상세페이지').replace(/[\\/:*?"<>|]/g,'').trim().slice(0,40) || '상세페이지'; }
+function baseName(){ return safeName(state.meta.productName); }
+function dlFormat(){ var r = document.querySelector('input[name="dlFmt"]:checked'); return r ? r.value : 'jpg'; }
+function fmtMB(n){ return (n/1024/1024).toFixed(1)+'MB'; }
+function emptySlotCount(){ var n = 0; state.sections.forEach(function(s){ slotsOf(s).forEach(function(sl){ if(s.type!=='reviews' && !sl.arr.filter(function(im){ return imgUrl(im.id); }).length) n++; }); }); return n; }
+function emptyNote(){ var n = emptySlotCount(); return n ? ' · 사진이 비어 있는 칸 '+n+'곳은 빼고 만들었어요.' : ''; }
+// 섹션 하나를 가로 860px 원본 크기로 따로 그려서 이미지로 찍음 (t: 통계 숫자가 올라가는 중간 장면)
+function captureSec(s, idx, t){
+  if(!window.html2canvas) return Promise.reject(new Error('이미지 도구를 불러오지 못했어요. 새로고침 후 다시 해주세요.'));
+  var host = $('capHost');
+  host.innerHTML = dpOpen('--u:1px; width:860px;')+renderSec(s, idx, {cap:true, t:t})+'</div>';
+  var target = host.firstChild;
+  var imgs = Array.prototype.slice.call(target.querySelectorAll('img'));
+  return Promise.all([document.fonts && document.fonts.ready ? document.fonts.ready : null].concat(imgs.map(function(im){ return im.decode ? im.decode().catch(function(){}) : null; })))
+    .then(function(){ return html2canvas(target, {backgroundColor:null, scale:(IS_MOBILE ? 1.5 : 2), useCORS:true, logging:false}); })
+    .then(function(c){ host.innerHTML = ''; if(!c || !c.width || !c.height) throw new Error('빈 이미지'); return c; }, function(e){ host.innerHTML = ''; throw e; });
+}
+var JPG_MAX = 19.5*1024*1024, JPG_SIDE = 65000;
+function scaled(src, k){
+  var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(src.width*k)); c.height = Math.max(1, Math.round(src.height*k));
+  var x = c.getContext('2d'); x.fillStyle = '#ffffff'; x.fillRect(0,0,c.width,c.height); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); return c;
+}
+function jpegUnder(canvas, max){
+  var qs = [0.92, 0.86, 0.8, 0.72, 0.64], k0 = Math.min(1, JPG_SIDE/Math.max(canvas.width, canvas.height));
+  function attempt(k, qi){
+    var c = scaled(canvas, k);
+    return canvasBlob(c, 'image/jpeg', qs[qi]).then(function(b){
+      if(b && (b.size<=max || (qi===qs.length-1 && k<0.35))) return {blob:b, width:c.width, ext:'jpg'};
+      if(b && qi<qs.length-1) return attempt(k, qi+1);
+      return attempt(k*0.82, 2);
+    });
+  }
+  return attempt(k0, 0);
+}
+function toFileBlob(canvas, limit){
+  if(dlFormat()==='png') return canvasBlob(canvas, 'image/png').then(function(b){ return {blob:b, ext:'png', width:canvas.width}; });
+  return jpegUnder(canvas, limit ? JPG_MAX : Infinity);
+}
+function secFile(i, s, ext){ return baseName()+'_'+('0'+(i+1)).slice(-2)+'_'+sectionName(s).replace(/[\\\/:*?"<>|]+/g,'·')+'.'+ext; }
+function downloadOne(s){
+  var i = sectionIndex(s.id);
+  return captureSec(s, i).then(function(c){ return toFileBlob(c, false); }).then(function(r){ return saveFile(secFile(i, s, r.ext), r.blob); });
+}
+function busy(btn, fn){
+  if(!state.sections.length){ toast('먼저 1단계에서 기획안을 만들어주세요.'); return; }
+  var o = btn.textContent; btn.disabled = true;
+  Promise.resolve().then(function(){ return fn(function(t){ btn.textContent = t; }); })
+    .catch(function(e){ toast('만들지 못했어요. 다시 시도해주세요. '+(e && e.message ? '['+e.message+']' : ''), 5000); })
+    .then(function(){ btn.disabled = false; btn.textContent = o; });
+}
+function eachSection(fn){ return state.sections.reduce(function(p, s, i){ return p.then(function(){ return fn(s, i); }); }, Promise.resolve()); }
+$('btnDownloadAll').addEventListener('click', function(){
+  busy(this, function(say){
+    var cv = [], failed = [];
+    return eachSection(function(s, i){ say('이미지 만드는 중… ('+(i+1)+'/'+state.sections.length+')'); return captureSec(s, i).then(function(c){ cv.push(c); }, function(){ failed.push(sectionName(s)); }); }).then(function(){
+      if(!cv.length) throw new Error('모든 섹션 실패');
+      var w = Math.max.apply(null, cv.map(function(c){ return c.width; })), h = cv.reduce(function(a, c){ return a+c.height; }, 0);
+      var k = Math.min(1, Math.sqrt((IS_MOBILE ? 16e6 : 12e7)/(w*h)));
+      var m = document.createElement('canvas'); m.width = Math.max(1, Math.floor(w*k)); m.height = Math.max(1, Math.floor(h*k));
+      var x = m.getContext('2d'); x.fillStyle = '#ffffff'; x.fillRect(0, 0, m.width, m.height);
+      var y = 0; cv.forEach(function(c){ var ch = Math.round(c.height*k); x.drawImage(c, 0, y, Math.round(c.width*k), ch); y += ch; });
+      say('파일로 저장하는 중…');
+      return toFileBlob(m, true).then(function(r){
+        if(!r.blob) throw new Error('파일 변환 실패');
+        $('dlStatus').textContent = '완료 · '+r.ext.toUpperCase()+' '+fmtMB(r.blob.size)+' · 가로 '+r.width+'px'+(failed.length ? ' · 만들지 못한 섹션: '+failed.join(', ') : '')+emptyNote();
+        return saveFile(baseName()+'_전체상세페이지.'+r.ext, r.blob);
+      });
+    });
+  });
+});
+function needZip(){ if(!window.JSZip) throw new Error('압축 도구를 불러오지 못했어요. 새로고침 후 다시 해주세요.'); return new JSZip(); }
+$('btnDownloadEach').addEventListener('click', function(){
+  busy(this, function(say){
+    var zip = needZip(), failed = [], n = 0;
+    return eachSection(function(s, i){ say('이미지 만드는 중… ('+(i+1)+'/'+state.sections.length+')'); return captureSec(s, i).then(function(c){ return toFileBlob(c, false); }).then(function(r){ zip.file(secFile(i, s, r.ext), r.blob); n++; }, function(){ failed.push((i+1)+'번 '+sectionName(s)); }); })
+      .then(function(){ if(!n) throw new Error('모든 섹션 실패'); say('ZIP으로 묶는 중…'); return zip.generateAsync({type:'blob'}); })
+      .then(function(blob){ $('dlStatus').textContent = '완료 · 섹션 '+n+'장 · ZIP '+fmtMB(blob.size)+(failed.length ? ' · 만들지 못한 섹션: '+failed.join(', ') : '')+emptyNote(); return saveFile(baseName()+'_섹션별.zip', blob); });
+  });
+});
+// 스마트스토어는 코드가 지워지므로 움직임은 GIF로 넣음
+var gifencP = null;
+function loadGifenc(){ if(!gifencP) gifencP = import('https://cdn.jsdelivr.net/npm/gifenc@1.0.3/dist/gifenc.esm.js').catch(function(e){ gifencP = null; throw e; }); return gifencP; }
+function statsGif(s, idx, say){
+  var steps = [0, .1, .22, .36, .5, .62, .72, .8, .87, .92, .96, .985, 1], ease = function(x){ return 1-Math.pow(1-x, 3); }, W = 860, frames = [];
+  return loadGifenc().then(function(G){
+    return steps.reduce(function(p, x, i){
+      return p.then(function(){
+        say('움직이는 통계 만드는 중… ('+(i+1)+'/'+steps.length+')');
+        return captureSec(s, idx, x===1 ? 1 : ease(x)).then(function(c){
+          var h = Math.round(c.height*W/c.width), cv = document.createElement('canvas'); cv.width = W; cv.height = h;
+          var x2 = cv.getContext('2d'); x2.imageSmoothingQuality = 'high'; x2.drawImage(c, 0, 0, W, h);
+          frames.push(x2.getImageData(0, 0, W, h));
+        });
+      });
+    }, Promise.resolve()).then(function(){
+      var last = frames[frames.length-1], w = last.width, h = last.height, pal = G.quantize(last.data, 256), enc = G.GIFEncoder();
+      frames.forEach(function(f, i){ if(f.width!==w || f.height!==h) return; enc.writeFrame(G.applyPalette(f.data, pal), w, h, {palette:i===0 ? pal : undefined, delay:i===frames.length-1 ? 3200 : (i===0 ? 500 : 70), repeat:0}); });
+      enc.finish(); return new Blob([enc.bytes()], {type:'image/gif'});
+    });
+  });
+}
+$('btnSmartZip').addEventListener('click', function(){
+  busy(this, function(say){
+    var zip = needZip(), failed = [], n = 0, gifs = 0, gifFail = false;
+    var still = function(s, i){ return captureSec(s, i).then(function(c){ return jpegUnder(c, JPG_MAX); }).then(function(r){ zip.file(secFile(i, s, 'jpg'), r.blob); n++; }); };
+    return eachSection(function(s, i){
+      say('이미지 만드는 중… ('+(i+1)+'/'+state.sections.length+')');
+      var job = s.type==='stats' ? statsGif(s, i, say).then(function(b){ zip.file(secFile(i, s, 'gif'), b); n++; gifs++; }, function(){ gifFail = true; return still(s, i); }) : still(s, i);
+      return job.catch(function(){ failed.push((i+1)+'번 '+sectionName(s)); });
+    }).then(function(){
+      if(!n) throw new Error('모든 섹션 실패');
+      var aeo = $('aeoText').value.trim(); if(aeo) zip.file('검색용_글자.txt', '﻿'+aeo.replace(/\n/g, '\r\n'));
+      say('ZIP으로 묶는 중…'); return zip.generateAsync({type:'blob'});
+    }).then(function(blob){
+      $('dlStatus').textContent = '완료 · 스마트스토어용 '+n+'장 · ZIP '+fmtMB(blob.size)+(gifs ? ' (통계는 움직이는 GIF)' : '')+(gifFail ? ' · 움직이는 통계를 만들지 못해 일반 이미지로 넣었어요' : '')+(failed.length ? ' · 만들지 못한 섹션: '+failed.join(', ') : '')+emptyNote();
+      return saveFile(baseName()+'_스마트스토어용.zip', blob);
+    });
+  });
+});
+
+// ================= 검색용 글자 (AEO) : 입력한 사실만으로 초안을 만듦 =================
+function josa(word, a, b){ var ch = String(word||'').trim().slice(-1), code = ch.charCodeAt(0); if(!(code>=0xAC00 && code<=0xD7A3)) return a+'('+b+')'; return ((code-0xAC00)%28) ? a : b; }
+function buildAeoDraft(){
+  var m = state.meta, f = {}; labelFieldsOf().forEach(function(x){ f[x.k] = String(x.v||'').trim(); });
+  if(!m.productName) return '';
+  var name = [brand.name, m.productName].filter(Boolean).join(' '), pts = parsePoints(m.points), rec = lines(m.recommend), use = lines(m.usage), rcp = parseRecipes(m.recipes), certs = lines(brand.certs);
+  var cat = m.category || f['식품유형'];
+  var sum = name+josa(name,'은','는')+' '+(cat ? cat+' 제품입니다.' : '식품입니다.');
+  var lead = pts.filter(function(p){ return p.body; })[0]; if(lead) sum += ' '+plain(lead.body).replace(/[.。]\s*$/,'')+'.';
+  if(certs.length) sum += ' '+certs.join(', ')+josa(certs[certs.length-1],'을','를')+' 받았습니다.';
+  var facts = [];
+  if(f['식품유형']) facts.push('식품유형: '+f['식품유형']);
+  if(f['원재료명']) facts.push('원재료: '+f['원재료명']);
+  if(rcp.length) facts.push('조리 방법: '+rcp[0].steps.map(function(x){ return plain(x.caption); }).join(' → '));
+  if(f['보관방법']) facts.push('보관 방법: '+f['보관방법']);
+  if(f['소비기한']) facts.push('소비기한: '+f['소비기한']);
+  if(f['알레르기 함유']) facts.push('알레르기 함유: '+f['알레르기 함유']);
+  if(use.length) facts.push('어울리는 활용: '+use.map(plain).join(', '));
+  if(certs.length) facts.push('인증: '+certs.join(', '));
+  var qna = [];
+  rcp.slice(0,2).forEach(function(g){ qna.push({q:(rcp.length>1 ? name+josa(name,'으로','로')+' '+g.label+josa(g.label,'을','를')+' 만들려면 어떻게 하나요?' : name+josa(name,'은','는')+' 어떻게 조리하나요?'), a:g.steps.map(function(x){ return plain(x.caption); }).join(' → ')}); });
+  if(f['보관방법']) qna.push({q:name+josa(name,'은','는')+' 어떻게 보관하나요?', a:f['보관방법']+(f['소비기한'] ? ' 소비기한은 '+f['소비기한']+'입니다.' : '')});
+  if(f['원재료명']) qna.push({q:name+'에는 어떤 원재료가 들어가나요?', a:f['원재료명']});
+  if(use.length) qna.push({q:name+josa(name,'은','는')+' 어떻게 먹으면 좋은가요?', a:use.map(plain).join(', ')+' 등으로 즐길 수 있습니다.'});
+  if(rec.length) qna.push({q:name+josa(name,'은','는')+' 어떤 분께 맞나요?', a:rec.slice(0,3).map(plain).join(' / ')});
+  var parts = [sum];
+  if(facts.length) parts.push('■ 한눈에 보는 정보\n'+facts.map(function(x){ return '• '+x; }).join('\n'));
+  if(qna.length) parts.push('■ 자주 묻는 질문\n\n'+qna.slice(0,5).map(function(x){ return 'Q. '+x.q+'\nA. '+x.a; }).join('\n\n'));
+  return parts.join('\n\n');
+}
+$('aeoText').addEventListener('input', function(){ state.meta.aeoText = this.value; state.meta.aeoEdited = true; save(); });
+$('btnAeoDraft').addEventListener('click', function(){ armTwice(this, '한 번 더 누르면 지금 글을 지우고 다시 만들어요', function(){ state.meta.aeoText = buildAeoDraft(); state.meta.aeoEdited = false; $('aeoText').value = state.meta.aeoText; save(); }); });
+$('btnAeoCopy').addEventListener('click', function(){
+  var text = $('aeoText').value.trim(); if(!text){ toast('복사할 글이 없어요. 제품 정보와 표시사항을 먼저 입력해주세요.'); return; }
+  var w = riskyIn(text); $('aeoStatus').textContent = w.length ? '표현 주의: "'+w[0].hit+'" · '+w[0].why : '';
+  // 스마트에디터는 서식을 지우므로 굵게·줄바꿈만 넣은 형태로도 함께 복사
+  var html = text.split('\n').map(function(l){ return l.trim() ? '<p>'+(/^(■|Q\.)/.test(l) ? '<b>'+esc(l)+'</b>' : esc(l))+'</p>' : '<p><br></p>'; }).join('');
+  try{
+    if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){
+      navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html], {type:'text/html'}), 'text/plain':new Blob([text], {type:'text/plain'})})]).then(function(){ toast('복사했어요. 스마트스토어 상세설명 맨 아래에 붙여넣어 주세요.'); }, function(){ copyText(text); });
+      return;
+    }
+  }catch(e){}
+  copyText(text, '복사했어요. 스마트스토어 상세설명 맨 아래에 붙여넣어 주세요.');
+});
+
+// ================= 내보내기: 카페24 코드 · HTML =================
+var EXPORT_ID = 'dp-detail', PFX = '#dp-detail#dp-detail#dp-detail';
+function motionLevel(){ var v = brand.cafeMotion; return (v==='full' || v==='off' || v==='text') ? v : 'light'; }
+var motionKf = [];
+// 움직임은 순수 CSS(스크롤 연동)만 사용 → 스크립트가 막힌 쇼핑몰에서도 되고, 지원하지 않는 브라우저에서는 완성된 화면이 그대로 보임
+function addMotion(stack){
+  motionKf = []; var LV = motionLevel(); if(LV==='off') return; var D = stack.ownerDocument;
+  var has = function(el){ return el.classList.contains('dp-m') || !!(el.parentNode && el.parentNode.closest && el.parentNode.closest('.dp-m')); };
+  var mark = function(el, kind, i){ if(!el || has(el)) return; el.classList.add('dp-m', 'dp-'+kind); if(i!=null) el.classList.add('dp-st', 'dp-i'+Math.min(i, 9)); };
+  var kids = function(el){ return Array.prototype.slice.call(el.children); };
+  var cnt = 0, inl = 0;
+  var cntSpan = function(numText){ var k = cnt++; motionKf.push('@keyframes dp-cnt-'+k+'{from{--dp-n:0} to{--dp-n:'+(+numText)+'}}', PFX+' .dp-cnt-'+k+'{animation-name:dp-cnt-'+k+';}'); return '<span class="dp-cnt dp-cnt-'+k+'"><span class="dp-v">'+numText+'</span></span>'; };
+  var reserve = stack.querySelectorAll('.bignum').length + 2*stack.querySelectorAll('.graph').length;
+  Array.prototype.forEach.call(stack.querySelectorAll('.sec'), function(sc, si){
+    if(si===0) return; // 첫 화면은 열자마자 보여야 함
+    var q = function(s){ return Array.prototype.slice.call(sc.querySelectorAll(s)); };
+    q('.bignum').forEach(function(el){ var m = /^(\s*)(\d{1,6})(?![\d.,])([\s\S]*)$/.exec(el.textContent||''); if(m) el.innerHTML = esc(m[1])+cntSpan(m[2])+esc(m[3]); });
+    q('.graph').forEach(function(g){
+      var fill = g.querySelector('.gfill'), pt = g.querySelector('.gpct');
+      if(fill){
+        var k = cnt++, len = parseFloat(fill.getAttribute('stroke-dasharray'));
+        fill.setAttribute('class', 'gfill dp-fill dp-fill-'+k);
+        motionKf.push(isNaN(len) ? '@keyframes dp-fill-'+k+'{from{width:0}}' : '@keyframes dp-fill-'+k+'{from{stroke-dashoffset:'+len.toFixed(2)+'}}', PFX+' .dp-fill-'+k+'{animation-name:dp-fill-'+k+';}');
+      }
+      if(pt){ var pm = /^(\d{1,3})%$/.exec((pt.textContent||'').trim()); if(pm) pt.innerHTML = cntSpan(pm[1])+'%'; }
+    });
+    if(!sc.classList.contains('s-label')) q('.headline, .tagline, .body-text, .closing, .quote').forEach(function(el){
+      if(inl >= 10-reserve) return;
+      var w = D.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nodes = [], nd; while((nd = w.nextNode())) nodes.push(nd);
+      for(var ni=0; ni<nodes.length; ni++){
+        var tn = nodes[ni], mm = /(^|[^\d.,])(\d{2,3})(\s?)(%|년)/.exec(tn.nodeValue||''); if(!mm) continue;
+        var val = +mm[2]; if(mm[4]==='%' ? (val<10 || val>100) : (val<10 || val>99)) continue;
+        inl++; var cut = mm.index+mm[1].length, pre = tn.nodeValue.slice(0, cut), post = tn.nodeValue.slice(cut+mm[2].length);
+        var tmp = D.createElement('span'); tmp.innerHTML = cntSpan(mm[2]);
+        var par = tn.parentNode; par.insertBefore(D.createTextNode(pre), tn); par.insertBefore(tmp.firstChild, tn); tn.nodeValue = post; break;
+      }
+    });
+    if(LV==='light') return;
+    if(LV==='text'){ q('.headline').forEach(function(el){ if(!el.closest('.ov')) mark(el, 'up'); }); return; }
+    ['.creds', '.badges', '.plaques', '.progs', '.recs', '.recap', '.tiles', '.revs', '.ships', '.shots', '.grid2', '.tvs'].forEach(function(sel){ q(sel).forEach(function(p){ kids(p).forEach(function(c, i){ mark(c, 'up', i); }); }); });
+    q('.step').forEach(function(el, i){ mark(el, 'up', i); });
+    q('.portrait').forEach(function(el){ mark(el, 'pop'); });
+    q('.cut').forEach(function(el){ mark(el, 'up'); });
+    if(!sc.classList.contains('s-banner')) q('.ph').forEach(function(el){ mark(el, si%2 ? 'right' : 'left'); });
+    q('.num, .eyebrow, .kicker, .onair, .headline, .body-text, .quote, .biglabel, .graph, .closing, .group-label, .award-foot, .tagline, .signoff, .logo, .cta-pill, .ship-note').forEach(function(el){ if(!el.closest('.ov')) mark(el, 'up'); });
+  });
+}
+function motionCss(){
+  if(motionLevel()==='off') return '';
+  var P = PFX, st = [];
+  for(var i=0;i<10;i++) st.push(P+' .dp-st.dp-i'+i+'{animation-range:entry '+Math.min(i*12, 60)+'% cover '+Math.min(26+i*6, 50)+'%;}');
+  return '@property --dp-n{syntax:"<integer>"; inherits:false; initial-value:0;}\n'+
+    '@media (prefers-reduced-motion: no-preference){\n@supports (animation-timeline: view()){\n'+
+    '@keyframes dp-up{from{opacity:0; transform:translateY(46px);}}\n@keyframes dp-left{from{opacity:0; transform:translateX(-90px);}}\n@keyframes dp-right{from{opacity:0; transform:translateX(90px);}}\n@keyframes dp-pop{from{opacity:0; transform:scale(.82);}}\n'+
+    P+' .dp-m, '+P+' .dp-cnt, '+P+' .dp-fill{animation-duration:1ms; animation-fill-mode:both; animation-timing-function:ease-out; animation-timeline:view(); animation-range:entry 5% cover 30%;}\n'+
+    P+' .dp-up{animation-name:dp-up;}\n'+P+' .dp-left{animation-name:dp-left;}\n'+P+' .dp-right{animation-name:dp-right;}\n'+P+' .dp-pop{animation-name:dp-pop;}\n'+st.join('\n')+'\n'+
+    P+' .dp-cnt{counter-reset:dpn var(--dp-n); animation-timing-function:cubic-bezier(.2,.7,.3,1); animation-range:entry 50% cover 42%;}\n'+
+    P+' .dp-cnt .dp-v{display:none !important;}\n'+P+' .dp-cnt::after{content:counter(dpn);}\n'+
+    P+' .dp-fill{animation-timing-function:cubic-bezier(.2,.7,.3,1); animation-range:entry 50% cover 42%;}\n'+
+    P+' .graph{view-timeline-name:--dpg;}\n'+P+' .graph .dp-fill, '+P+' .graph .dp-cnt{animation-timeline:--dpg;}\n'+
+    motionKf.join('\n')+'\n}\n}';
+}
+function exportCss(){
+  return PFX+'{'+themeVars()+'}\n'+artCss(PFX)+'\n'+
+    PFX+' *{font-family:inherit; letter-spacing:inherit; text-indent:0 !important; float:none !important;}\n'+
+    PFX+' img{box-shadow:none !important; border-radius:0 !important;}\n'+
+    '.dp-wrap{max-width:860px; margin:0 auto; container-type:inline-size;}\n'+
+    PFX+'{--u:min(.11628vw, 1px); max-width:860px; margin:0 auto; overflow:hidden;}\n'+
+    '@supports (width:1cqw){ '+PFX+'{--u:min(.11628cqw, 1px);} }\n'+
+    '@media (max-width:520px){\n'+artCss(PFX, ART_MOBILE)+'\n}\n'+motionCss();
+}
+function fontLink(){ return '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'+THEMES[themeOf()].fonts+'&display=swap">'; }
+// 내보낼 화면을 만들고, 그 안에 쓰인 사진 목록을 함께 돌려줌 (사진 자리는 dpimg:아이디 로 표시해 두고 나중에 주소로 바꿈)
+function exportStack(){
+  var used = [], src = function(id){ if(!imgUrl(id)) return ''; if(used.indexOf(id)<0) used.push(id); return 'dpimg:'+id; };
+  var box = new DOMParser().parseFromString('<!doctype html><body></body>', 'text/html').body; // 화면 밖 문서에서 만들어 사진을 미리 불러오지 않게 함
+  box.innerHTML = '<div class="dp-wrap"><div id="'+EXPORT_ID+'" class="dp t-'+themeOf()+'">'+state.sections.map(function(s, i){ return renderSec(s, i, {src:src}); }).join('')+'</div></div>';
+  var stack = box.querySelector('#'+EXPORT_ID);
+  Array.prototype.forEach.call(stack.querySelectorAll('.sec'), function(sec, i){ Array.prototype.forEach.call(sec.querySelectorAll('img'), function(im){ if(i>=2) im.setAttribute('loading','lazy'); im.setAttribute('decoding','async'); }); });
+  addMotion(stack);
+  return {html:box.innerHTML, used:used};
+}
+function blobToDataURL(blob){ return new Promise(function(res, rej){ var fr = new FileReader(); fr.onload = function(){ res(fr.result); }; fr.onerror = rej; fr.readAsDataURL(blob); }); }
+function extOf(t){ t = String(t||''); return t.indexOf('png')>=0 ? 'png' : t.indexOf('webp')>=0 ? 'webp' : t.indexOf('gif')>=0 ? 'gif' : 'jpg'; }
+// 파일 이름은 사진 내용으로 정함 → 같은 사진은 언제 만들어도 같은 이름
+function nameFor(id){
+  var blob = IMG[id].blob, ext = extOf(blob.type);
+  if(!(window.crypto && crypto.subtle)) return Promise.resolve('dp_'+id.slice(1,13)+'.'+ext);
+  return blob.arrayBuffer().then(function(buf){ return crypto.subtle.digest('SHA-1', buf); }).then(function(h){
+    return 'dp_'+Array.prototype.map.call(new Uint8Array(h), function(b){ return ('0'+b.toString(16)).slice(-2); }).join('').slice(0,12)+'.'+ext;
+  }).catch(function(){ return 'dp_'+id.slice(1,13)+'.'+ext; });
+}
+function cafePackage(){
+  var ex = exportStack(), names = {};
+  return ex.used.reduce(function(p, id){ return p.then(function(){ return nameFor(id).then(function(n){ names[id] = n; }); }); }, Promise.resolve()).then(function(){ return {html:ex.html, used:ex.used, names:names, css:exportCss()}; });
+}
+function cafeBaseFromInput(){ var v = ($('cafeBase').value||'').trim().replace(/^["']|["']$/g,''); if(!v || v.indexOf('/')<0) return ''; return v.slice(0, v.lastIndexOf('/')+1); }
+$('cafeBase').addEventListener('change', function(){ var b = cafeBaseFromInput(); if(b){ brand.cafeBase = b; this.value = b; save(); } });
+$('cafeMotionBox').addEventListener('change', function(e){ if(e.target.name==='cafeMotion'){ brand.cafeMotion = e.target.value; save(); $('cafeStatus').textContent = '효과를 바꿨어요. 코드를 다시 복사해서 붙여넣어 주세요.'; } });
+$('btnCafeZip').addEventListener('click', function(){
+  busy(this, function(say){
+    say('사진 모으는 중…'); var zip = needZip();
+    return cafePackage().then(function(pk){
+      if(!pk.used.length) throw new Error('올린 사진이 없어요');
+      pk.used.forEach(function(id){ zip.file(pk.names[id], IMG[id].blob); });
+      return zip.generateAsync({type:'blob'}).then(function(blob){ $('cafeStatus').textContent = '사진 '+pk.used.length+'장을 묶었어요. 압축을 풀어 카페24 파일 업로더에 모두 올려주세요.'; return saveFile(baseName()+'_카페24사진.zip', blob); });
+    });
+  });
+});
+$('btnCafeCode').addEventListener('click', function(){
+  var base = cafeBaseFromInput() || brand.cafeBase, st = $('cafeStatus'), ta = $('cafeCode');
+  if(!base){ st.innerHTML = '<span style="color:var(--danger);">3번 칸에 카페24에 올린 사진 주소를 먼저 붙여넣어 주세요.</span>'; $('cafeBase').focus(); return; }
+  busy(this, function(say){
+    say('코드 만드는 중…');
+    return cafePackage().then(function(pk){
+      var html = pk.html.replace(/dpimg:([A-Za-z0-9]+)/g, function(m, id){ return base+(pk.names[id]||''); });
+      var code = '<!-- '+esc(brand.name||'')+' 상세페이지 (카페24 붙여넣기용) -->\n'+fontLink()+'\n<style>\n'+pk.css+'\n</style>\n'+html+'\n';
+      ta.value = code; ta.hidden = false;
+      var list = pk.used.map(function(id){ return pk.names[id]; });
+      st.innerHTML = '코드를 만들었어요 ('+Math.round(code.length/1024)+'KB)'+esc(emptyNote())+(list.length ? '<details style="margin-top:4px;"><summary style="cursor:pointer;">이 코드에 쓰인 사진 '+list.length+'장 이름 보기 · '+esc(base)+' 폴더에 모두 있어야 해요</summary><div style="font-family:monospace; font-size:11px; line-height:1.6;">'+list.map(esc).join('<br>')+'</div></details>' : '');
+      copyText(code, '코드를 복사했어요. 카페24 상세설명 < > 화면에 붙여넣어 주세요.');
+    });
+  });
+});
+$('cafeCode').addEventListener('focus', function(){ this.select(); });
+$('btnDownloadHtml').addEventListener('click', function(){
+  busy(this, function(say){
+    say('HTML 만드는 중…');
+    var ex = exportStack(), urls = {};
+    return ex.used.reduce(function(p, id){ return p.then(function(){ return blobToDataURL(IMG[id].blob).then(function(u){ urls[id] = u; }); }); }, Promise.resolve()).then(function(){
+      var html = ex.html.replace(/dpimg:([A-Za-z0-9]+)/g, function(m, id){ return urls[id]||''; });
+      var title = [state.meta.productName, brand.name].filter(Boolean).join(' | ') || '상세페이지', desc = '';
+      for(var i=0;i<state.sections.length;i++){ var s = state.sections[i]; if(s.subtitle || s.body){ desc = plain(s.subtitle||s.body).replace(/\s+/g,' ').trim().slice(0,150); break; } }
+      var doc = '<!doctype html>\n<html lang="ko">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>'+esc(title)+'</title>\n'+(desc ? '<meta name="description" content="'+esc(desc)+'">\n' : '')+fontLink()+'\n<style>\nbody{margin:0; padding:0;}\n'+exportCss()+'\n</style>\n</head>\n<body>\n'+html+'\n</body>\n</html>\n';
+      return saveFile(baseName()+'_상세페이지.html', new Blob([doc], {type:'text/html;charset=utf-8'}));
+    });
+  });
+});
+
+// ================= 대표 이미지(썸네일) =================
+var thumbSt = {id:null, zoom:1, ox:.5, oy:.5, mode:'cover'}, thumbAdj = {}, thumbCache = {};
+function thumbIds(){ var ids = []; state.sections.forEach(function(s){ slotsOf(s).forEach(function(sl){ sl.arr.forEach(function(im){ if(imgUrl(im.id) && ids.indexOf(im.id)<0) ids.push(im.id); }); }); }); return ids; }
+function thumbLoad(id){ if(!thumbCache[id]) thumbCache[id] = new Promise(function(res, rej){ var im = new Image(); im.onload = function(){ res(im); }; im.onerror = rej; im.src = imgUrl(id); }); return thumbCache[id]; }
+function thumbDraw(canvas, id, st){
+  return thumbLoad(id).then(function(im){
+    var S = canvas.width, x = canvas.getContext('2d'), w = im.naturalWidth, h = im.naturalHeight;
+    var base = st.mode==='contain' ? Math.min(S/w, S/h) : Math.max(S/w, S/h), sc = base*st.zoom, dw = w*sc, dh = h*sc;
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, S, S); x.imageSmoothingQuality = 'high';
+    x.drawImage(im, (S-dw)*st.ox, (S-dh)*st.oy, dw, dh);
+  });
+}
+function renderThumbPicker(){
+  var ids = thumbIds(), pk = $('thumbPicker'), ed = $('thumbEditor');
+  if(!ids.length){ pk.innerHTML = '<span class="hint">2단계에서 사진을 올리면 여기에 나와요.</span>'; ed.hidden = true; return; }
+  if(!thumbSt.id || ids.indexOf(thumbSt.id)<0){ thumbSt.id = ids[0]; thumbSt.zoom = 1; thumbSt.ox = .5; thumbSt.oy = .5; }
+  pk.innerHTML = ids.map(function(id){ return '<button type="button" data-thumb="'+id+'"'+(id===thumbSt.id ? ' class="on"' : '')+' aria-label="이 사진 고르기"><img src="'+imgUrl(id)+'" alt=""></button>'; }).join('');
+  ed.hidden = false; $('thumbZoom').value = Math.round(thumbSt.zoom*100); thumbDraw($('thumbCanvas'), thumbSt.id, thumbSt).catch(function(){});
+}
+$('thumbPicker').addEventListener('click', function(e){
+  var b = e.target.closest('[data-thumb]'); if(!b) return;
+  thumbAdj[thumbSt.id] = {zoom:thumbSt.zoom, ox:thumbSt.ox, oy:thumbSt.oy};
+  thumbSt.id = b.dataset.thumb; var a = thumbAdj[thumbSt.id] || {zoom:1, ox:.5, oy:.5}; thumbSt.zoom = a.zoom; thumbSt.ox = a.ox; thumbSt.oy = a.oy; renderThumbPicker();
+});
+$('thumbZoom').addEventListener('input', function(){ thumbSt.zoom = Math.max(1, (+this.value||100)/100); thumbDraw($('thumbCanvas'), thumbSt.id, thumbSt); });
+Array.prototype.forEach.call(document.querySelectorAll('input[name="thumbMode"]'), function(r){ r.addEventListener('change', function(){ thumbSt.mode = this.value; thumbDraw($('thumbCanvas'), thumbSt.id, thumbSt); }); });
+(function(){
+  var cv = $('thumbCanvas'), drag = null;
+  cv.addEventListener('pointerdown', function(e){ drag = {x:e.clientX, y:e.clientY, ox:thumbSt.ox, oy:thumbSt.oy}; try{ cv.setPointerCapture(e.pointerId); }catch(err){} });
+  cv.addEventListener('pointermove', function(e){
+    if(!drag) return; var w = cv.clientWidth||320;
+    thumbSt.ox = Math.max(0, Math.min(1, drag.ox - (e.clientX-drag.x)/w)); thumbSt.oy = Math.max(0, Math.min(1, drag.oy - (e.clientY-drag.y)/w));
+    thumbDraw(cv, thumbSt.id, thumbSt);
+  });
+  var end = function(){ drag = null; }; cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+})();
+$('btnThumbDownload').addEventListener('click', function(){
+  var btn = this; btn.disabled = true;
+  thumbDraw($('thumbCanvas'), thumbSt.id, thumbSt).then(function(){ return canvasBlob($('thumbCanvas'), 'image/jpeg', 0.92); }).then(function(b){ return saveFile(baseName()+'_썸네일.jpg', b); })
+    .catch(function(){ toast('썸네일을 만들지 못했어요.'); }).then(function(){ btn.disabled = false; });
+});
+$('btnThumbAll').addEventListener('click', function(){
+  busy(this, function(say){
+    var zip = needZip(), ids = thumbIds(), c = document.createElement('canvas'); c.width = c.height = 1200;
+    thumbAdj[thumbSt.id] = {zoom:thumbSt.zoom, ox:thumbSt.ox, oy:thumbSt.oy};
+    return ids.reduce(function(p, id, i){ return p.then(function(){ say('썸네일 만드는 중… ('+(i+1)+'/'+ids.length+')'); var a = thumbAdj[id] || {zoom:1, ox:.5, oy:.5}; return thumbDraw(c, id, {zoom:a.zoom, ox:a.ox, oy:a.oy, mode:thumbSt.mode}).then(function(){ return canvasBlob(c, 'image/jpeg', 0.92); }).then(function(b){ zip.file(baseName()+'_썸네일_'+('0'+(i+1)).slice(-2)+'.jpg', b); }); }); }, Promise.resolve())
+      .then(function(){ return zip.generateAsync({type:'blob'}); }).then(function(blob){ return saveFile(baseName()+'_썸네일.zip', blob); });
+  });
+});
+
+// ================= 제품 스펙북 =================
+function specRows(p){
+  var m = p.meta, lf = (m.labelFields||[]).filter(function(f){ return String(f.v||'').trim(); }).map(function(f){ return f.k+': '+f.v; }).join('\n');
+  return [['카테고리', m.category], ['첫 화면 한 줄', m.heroTitle], ['제품 특징', m.points], ['추천 대상', m.recommend], ['활용 방법', m.usage], ['조리법', m.recipes], ['핵심 단어', m.keyPointsRaw], ['식품 표시사항', lf]].filter(function(r){ return String(r[1]||'').trim(); });
+}
+function specText(key){ var p = products[key]; return '['+key+']\n'+specRows(p).map(function(r){ return '■ '+r[0]+'\n'+r[1]; }).join('\n\n'); }
+function renderSpecTab(){
+  var keys = Object.keys(products).sort(), el = $('specBody');
+  el.innerHTML = '<div class="card"><h2>제품 스펙북</h2><p class="hint">제품마다 입력해 둔 정보와 표시사항을 한곳에 모아 봐요. 쇼핑몰에 상품을 등록할 때 항목별로 복사해서 쓰세요. 내용은 1단계에서 고치면 여기에 반영돼요.</p></div>'+
+    (keys.length ? keys.map(function(k){
+      var p = products[k], rows = specRows(p);
+      return '<div class="sb-card" data-key="'+esc(k)+'"><div class="sb-head"><b>'+esc(k)+'</b><span class="btn-row" style="margin:0;"><span class="hint" style="margin:0;">'+(p.sections && p.sections.length ? '상세페이지 '+p.sections.length+'개 섹션 보관' : '기획안 없음')+'</span>'+
+        '<button type="button" class="btn btn-sm" data-sb="open">열기</button><button type="button" class="btn btn-sm" data-sb="copyall">전체 복사</button><button type="button" class="btn btn-sm btn-ghost btn-danger" data-sb="del">지우기</button></span></div>'+
+        '<div class="sb-rows">'+(rows.length ? rows.map(function(r, i){ return '<div class="sb-lab">'+esc(r[0])+'</div><div class="sb-val">'+esc(r[1])+'</div><div><button type="button" class="btn btn-sm" data-sb="copy" data-i="'+i+'">복사</button></div>'; }).join('') : '<div class="sb-val" style="grid-column:1/-1;">아직 입력한 정보가 없어요.</div>')+'</div></div>';
+    }).join('') : '<div class="card"><p class="hint" style="margin:0;">아직 저장된 제품이 없어요. 1단계에서 제품명을 적으면 자동으로 여기에 모여요.</p></div>');
+}
+$('specBody').addEventListener('click', function(e){
+  var b = e.target.closest('[data-sb]'); if(!b) return; var key = b.closest('.sb-card').dataset.key, p = products[key]; if(!p) return;
+  if(b.dataset.sb==='open'){ curTab = 'plan'; openProduct(key); }
+  if(b.dataset.sb==='copyall') copyText(specText(key), '"'+key+'" 정보를 모두 복사했어요.');
+  if(b.dataset.sb==='copy'){ var r = specRows(p)[+b.dataset.i]; if(r) copyText(r[1], r[0]+' 복사했어요.'); }
+  if(b.dataset.sb==='del') armTwice(b, '한 번 더 누르면 지워요', function(){
+    delete products[key];
+    if(productKey()===key) state = {meta:defaultMeta(), sections:[]};
+    fillForms(); Store.set('products', clone(products)).then(saveNow); renderSpecTab();
+  });
+});
+
+// ================= 백업 · 초기화 · 예시 =================
+function usedImageIds(){
+  var ids = {}, add = function(a){ (a||[]).forEach(function(im){ if(im && im.id) ids[im.id] = 1; }); };
+  var scan = function(secs){ (secs||[]).forEach(function(s){ add(s.images); (s.tiles||[]).forEach(function(t){ add(t.images); }); (s.groups||[]).forEach(function(g){ add(g.images); }); }); };
+  if(brand.logoId) ids[brand.logoId] = 1; if(brand.portraitId) ids[brand.portraitId] = 1; add(brand.awardImgs); add(brand.mediaImgs);
+  scan(state.sections); Object.keys(products).forEach(function(k){ scan(products[k].sections); });
+  return ids;
+}
+$('btnBackup').addEventListener('click', function(){
+  var btn = this; btn.disabled = true; $('backupStatus').textContent = '백업 파일을 만드는 중…';
+  clearTimeout(saveTimer);
+  saveNow().then(function(){
+    var ids = Object.keys(usedImageIds()).filter(function(id){ return IMG[id]; }), images = {};
+    return ids.reduce(function(p, id){ return p.then(function(){ return blobToDataURL(IMG[id].blob).then(function(u){ images[id] = u; }); }); }, Promise.resolve()).then(function(){
+      var d = new Date(), stamp = d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);
+      var json = JSON.stringify({app:'detail-maker', v:1, savedAt:d.toISOString(), brand:brand, current:state, products:products, images:images});
+      $('backupStatus').textContent = '백업 파일을 만들었어요 ('+fmtMB(json.length)+', 사진 '+ids.length+'장 포함).';
+      return saveFile('상세페이지메이커_백업_'+stamp+'.json', new Blob([json], {type:'application/json'}));
+    });
+  }).catch(function(){ $('backupStatus').textContent = '백업 파일을 만들지 못했어요.'; }).then(function(){ btn.disabled = false; });
+});
+function dataUrlBlob(u){ var m = /^data:([^;,]+)?(;base64)?,(.*)$/.exec(u||''); if(!m) return null; var bin = m[2] ? atob(m[3]) : decodeURIComponent(m[3]), a = new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) a[i] = bin.charCodeAt(i); return new Blob([a], {type:m[1]||'image/jpeg'}); }
+$('restoreFile').addEventListener('change', function(){
+  var file = this.files && this.files[0]; this.value = ''; if(!file) return;
+  $('backupStatus').textContent = '백업 파일을 불러오는 중…';
+  file.text().then(function(t){
+    var d = JSON.parse(t); if(!d || d.app!=='detail-maker' || !d.brand) throw new Error('형식');
+    var ids = Object.keys(d.images||{});
+    return ids.reduce(function(p, id){ return p.then(function(){ var b = dataUrlBlob(d.images[id]); if(!b) return; registerImg(id, b); return Store.putImg(id, b).catch(storeFail); }); }, Promise.resolve()).then(function(){
+      brand = merge(defaultBrand(), d.brand); brand.isExample = false; products = d.products||{}; state = d.current || {meta:defaultMeta(), sections:[]};
+      fillForms(); renderExampleBar(); return saveNow();
+    }).then(function(){ $('backupStatus').textContent = '백업을 불러왔어요 (제품 '+Object.keys(products).length+'개, 사진 '+ids.length+'장).'; switchTab('brand'); });
+  }).catch(function(){ $('backupStatus').textContent = '이 파일은 불러올 수 없어요. 이 도구에서 받은 백업 파일(.json)인지 확인해주세요.'; });
+});
+function wipeAll(keepDesign){
+  var th = brand.theme, ac = brand.accent;
+  Object.keys(IMG).forEach(function(id){ URL.revokeObjectURL(IMG[id].url); }); IMG = {}; thumbCache = {};
+  brand = defaultBrand(); if(keepDesign){ brand.theme = th; brand.accent = ac; }
+  products = {}; state = {meta:defaultMeta(), sections:[]};
+  return Store.clearAll().catch(storeFail).then(saveNow).then(function(){ fillForms(); renderExampleBar(); switchTab('brand'); });
+}
+$('btnWipe').addEventListener('click', function(){ armTwice(this, '한 번 더 누르면 브랜드·제품·사진을 모두 지워요', function(){ wipeAll(false).then(function(){ toast('모든 자료를 지웠어요.'); }); }); });
+function merge(base, over){ for(var k in over){ if(over[k]!==undefined && over[k]!==null) base[k] = over[k]; } return base; }
+function renderExampleBar(){
+  $('exampleBar').innerHTML = brand.isExample ? '<div class="example-bar"><span><b>예시 자료가 들어 있어요.</b> 화면이 어떻게 쓰이는지 둘러본 뒤, 내 자료로 바꿔 주세요. (예시 브랜드와 수치는 실제가 아니에요)</span><button type="button" class="btn btn-sm" id="btnStartMine">내 자료로 새로 시작</button></div>' : '';
+}
+$('exampleBar').addEventListener('click', function(e){ if(e.target.id==='btnStartMine') wipeAll(true).then(function(){ toast('예시를 지웠어요. 브랜드 정보부터 입력해주세요.'); $('bName').focus(); }); });
+function loadExample(){
+  brand = merge(defaultBrand(), { isExample:true, name:'예시상회', en:'YESI MARKET', tagline:'(예시) 충북 괴산에서 누룽지를 굽는 작은 식품 브랜드', theme:'modern', accent:'#1F6F54',
+    storyQuote:'우리 집 밥상에 올리는 그대로 만듭니다', storyBody:'(예시) 2012년 괴산의 작은 방앗간에서 시작했어요. 직접 도정한 쌀로 밥을 짓고 가마솥에 눌려 누룽지를 굽습니다.',
+    certs:'HACCP 인증', awards:'2023 (예시) 충북 우수 농식품 선정\n2024 (예시) 지역 특산물 품평회 우수상', media:'',
+    statBigNum:'87%', statBigLabel:'(예시) 다시 주문하신 고객 비율 · 2025년 자사몰 기준', statPct:'93', statPctLabel:'(예시) 구매 만족도', statClosing:'한 번 드신 분들이 다시 찾아주십니다',
+    banned:'수제, 손맛', company:'(주)예시상회', companyRole:'제조원', addr:'충북 괴산군 예시면 예시로 12', tel:'043-000-0000', returnPlace:'본사 및 구입처',
+    shipTitle:'받으신 뒤 서늘한 곳에 보관해주세요', shipBody:'상온 제품이라 일반 택배로 보내드려요. 개봉 후에는 지퍼를 꼭 닫아주세요.', shipIcons:'🚚 | 평일 오후 2시 이전 주문 | 당일 출고\n📦 | 제주·도서 지역 | 하루 이틀 더 걸려요' });
+  state = { meta: merge(defaultMeta(), { productName:'가마솥 우리쌀 누룽지', category:'누룽지', heroTitle:'아침이 바쁜 날, 끓이기만 하면 구수한 한 끼', heroSub:'가마솥에 눌려 구웠어요',
+    banner:'물만 부어 3분, 구수한 숭늉 한 그릇', bannerSub:'', points:'우리쌀로 지은 밥 | 국내산 쌀로 밥을 지어 눌려서 씹을수록 고소해요\n가마솥에 천천히 | 두껍게 눌려 구워 끓여도 쉽게 풀어지지 않아요\n한 번 먹을 만큼씩 | 낱개로 담아 필요한 만큼만 꺼내 쓰면 돼요',
+    sizzle:'보글보글 끓어오르는 구수한 향\n바삭하게 한 조각, 간식으로도\n따뜻한 숭늉으로 마무리', cmpTitle:'두껍게 구워 끓여도 식감이 살아 있어요', cmpBody:'얇게 누른 누룽지보다 오래 눌려 구워서 끓인 뒤에도 쫀득하게 씹혀요.', cmpTag:'끓여도, 그냥 먹어도 고소하게',
+    recommend:'아침을 간단하고 든든하게 챙기고 싶은 분\n부모님 간식을 찾고 계신 분\n캠핑·여행에 가볍게 챙길 한 끼가 필요한 분\n아이에게 담백한 간식을 주고 싶은 분', usage:'끓여서 누룽지탕으로\n뜨거운 물을 부어 숭늉으로\n그대로 바삭한 간식으로',
+    recipes:'## 끓이는 누룽지\n냄비에 물 500ml와 누룽지 한 장을 넣어요\n센 불에서 끓어오르면 약한 불로 줄여 3분 더 끓여요\n그릇에 담아 김치와 함께 내요\n## 숭늉\n컵에 누룽지 반 장을 넣어요\n뜨거운 물을 붓고 3분 기다려요',
+    reviews:'(예시) 아침마다 끓여 먹는데 구수해서 속이 편안해요\n(예시) 부모님이 좋아하셔서 두 번째 주문이에요\n(예시) 그냥 먹어도 바삭하고 고소해요', ctaTitle:'내일 아침, 구수한 누룽지 한 그릇 어떠세요', keyPointsRaw:'우리쌀, 가마솥, 3분' }), sections: [] };
+  var f = labelFieldsOf(state.meta), set = function(k, v){ f.filter(function(x){ return x.k===k; })[0].v = v; };
+  set('식품유형', '곡류가공품'); set('품목보고번호', '(예시) 0000000000000'); set('소비기한', '제조일로부터 12개월'); set('보관방법', '직사광선을 피해 서늘하고 건조한 곳에 보관'); set('원재료명', '쌀(국내산)'); set('알레르기 함유', '해당 없음');
+  state.sections = buildSections();
+}
+
+// ================= 시작 =================
+function gcImages(){ var used = usedImageIds(); Object.keys(IMG).forEach(function(id){ if(!used[id]){ URL.revokeObjectURL(IMG[id].url); delete IMG[id]; Store.delImg(id).catch(function(){}); } }); }
+$('artCss').textContent = artCss('.dp');
+initPlatform();
+Store.open().then(function(ok){
+  if(!ok) $('storeWarn').innerHTML = '<div class="warnbox" style="margin-bottom:14px;"><b>이 브라우저에서는 자료를 저장할 수 없어요.</b> 창을 닫으면 입력한 내용이 사라져요. 일반 창(시크릿 모드 아님)에서 열거나, 작업 후 브랜드 설정의 "백업 파일 받기"를 눌러 두세요.</div>';
+  return Promise.all([Store.get('brand'), Store.get('current'), Store.get('products'), Store.allImgs()]);
+}).catch(function(){ return [null, null, null, []]; }).then(function(r){
+  (r[3]||[]).forEach(function(x){ if(x.blob) registerImg(x.id, x.blob); });
+  var first = !r[0];
+  if(first) loadExample();
+  else {
+    brand = merge(defaultBrand(), r[0]); products = r[2]||{};
+    if(r[1] && r[1].meta) state = {meta:merge(defaultMeta(), r[1].meta), sections:r[1].sections||[]};
+    gcImages();
+  }
+  fillForms(); renderExampleBar(); setSaveState(Store.ok() ? 'ok' : 'off');
+  switchTab(first || !brand.name ? 'brand' : 'plan');
+  if(first) saveNow();
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ setU(); });
+});
+})();
+</script>
+</body>
+</html>
